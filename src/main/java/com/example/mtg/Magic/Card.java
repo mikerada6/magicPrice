@@ -14,6 +14,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Entity public class Card implements Comparable<Card> {
 
@@ -33,6 +35,7 @@ import java.util.HashMap;
 	private Date released_at;
 	@JsonIgnore
 	private Collection<Price> price;
+	private double printNumber;
 
 	public Card() {
 		name = null;
@@ -249,6 +252,18 @@ import java.util.HashMap;
 		public int compare(Card o1, Card o2) {
 			return 0;
 		}
+	}
+
+	public Map<String, Price> priceHashMap() {
+		return price.stream().collect(Collectors.toMap(s -> s.getDate().toString(), s -> s));
+	}
+
+	public double getPrintNumber() {
+		return printNumber;
+	}
+
+	public void setPrintNumber(double printNumber) {
+		this.printNumber = printNumber;
 	}
 }
 

@@ -87,7 +87,6 @@ import java.util.stream.Collectors;
 	ArrayList<Card> update() {
 		ArrayList<Card> cards = new ArrayList<Card>();
 		String url = "https://api.scryfall.com/cards";
-
 		logger.info("Starting update");
 
 		boolean cont = true;
@@ -137,23 +136,32 @@ import java.util.stream.Collectors;
 							card.setLegalities(legality);
 
 							cards.add(card);
+							try {
+								Thread.sleep(50);
+							} catch (InterruptedException e) {
+								e.printStackTrace();
+							}
+							if (cards.size() == 500) {
+								logger.info("Starting saving of " + cards.size() + " cards.");
+								cardRepository.saveAll(cards);
+
+								logger.info("Ending saving");
+								cards.clear();
+							}
 						}
 					} catch (Exception e) {
 						logger.error("Ran into error " + e + ".  With card " + name + "CARD:" + card);
 					}
 				}
 			}
-			logger.info("Starting saving of " + cards.size() + " cards.");
-			cardRepository.saveAll(cards);
-			try {
-				Thread.sleep(50);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			logger.info("Ending saving");
-			cards.clear();
-		}
 
+		}
+		cardRepository.saveAll(cards);
+		logger.info("Starting final saving of " + cards.size() + " cards.");
+		cardRepository.saveAll(cards);
+
+		logger.info("Ending saving");
+		cards.clear();
 		return cards;
 	}
 

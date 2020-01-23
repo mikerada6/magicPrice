@@ -81,4 +81,5 @@ import java.sql.Date;
 	public void setTix(Double tix) {
 		this.tix = tix;
 	}
+
 }
