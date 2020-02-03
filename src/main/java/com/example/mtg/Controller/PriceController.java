@@ -121,6 +121,12 @@ import java.util.stream.Collectors;
 
 	}
 
+	@GetMapping(path = "/count")
+	public @ResponseBody
+	long count() {
+		return cardRepository.count();
+	}
+
 	@GetMapping(path = "/history/")
 	public @ResponseBody
 	Map<String, Object> history() {

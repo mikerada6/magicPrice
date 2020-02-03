@@ -172,6 +172,16 @@ import java.util.stream.Collectors;
 		if (type_line.contains("Phenomenon")) {
 			types.add(Type.PHENOMENON);
 		}
+		if (type_line.contains("Vanguard")) {
+			types.add(Type.VANGUARD);
+		}
+		if (type_line.contains("Hero")) {
+			types.add(Type.HERO);
+		}
+		if (type_line.contains("Conspiracy")) {
+			types.add(Type.CONSPIRACY);
+		}
+
 		if (types.isEmpty()) {
 			logger.error("Did not set any type.  Was given " + type_line);
 		}

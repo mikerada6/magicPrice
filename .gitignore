@@ -131,3 +131,4 @@ buildNumber.properties
 # End of https://www.gitignore.io/api/java,maven,intellij
 
 src/main/resources/application.properties
+/src/main/resources/application-aws.properties
