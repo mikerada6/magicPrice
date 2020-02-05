@@ -36,6 +36,8 @@ import java.util.stream.Collectors;
 	@JsonIgnore
 	private Collection<Price> price;
 	private double printNumber;
+	private boolean promo;
+	private boolean variation;
 
 	public Card() {
 		name = null;
@@ -274,6 +276,22 @@ import java.util.stream.Collectors;
 
 	public void setPrintNumber(double printNumber) {
 		this.printNumber = printNumber;
+	}
+
+	public boolean isPromo() {
+		return promo;
+	}
+
+	public void setPromo(boolean promo) {
+		this.promo = promo;
+	}
+
+	public boolean isVariation() {
+		return variation;
+	}
+
+	public void setVariation(boolean variation) {
+		this.variation = variation;
 	}
 }
 

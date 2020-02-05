@@ -137,6 +137,8 @@ import java.util.stream.Collectors;
 							Date released_at = temp.has("released_at") ?
 									Date.valueOf(temp.get("released_at").getAsString()) :
 									null;
+							boolean promo = temp.has("promo") && temp.get("promo").getAsBoolean();
+							boolean variation = temp.has("variation") && temp.get("variation").getAsBoolean();
 							card.setName(name);
 							card.setCmc(cmc);
 							card.setId(id);
@@ -147,6 +149,8 @@ import java.util.stream.Collectors;
 							card.setCollector_number(collector_number);
 							card.setReleased_at(released_at);
 							card.setLegalities(legality);
+							card.setPromo(promo);
+							card.setVariation(variation);
 
 							cards.add(card);
 							if (cards.size() == 500) {
