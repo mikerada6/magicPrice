@@ -185,7 +185,7 @@ import java.util.stream.Collectors;
 		}
 
 		if (types.isEmpty()) {
-			logger.error("Did not set any type.  Was given " + type_line);
+			logger.warn("Did not set any type.  Was given {}", type_line);
 		}
 	}
 
