@@ -88,11 +88,24 @@ import java.util.stream.Collectors;
 		ArrayList<Card> cards = new ArrayList<Card>();
 		String url = "https://api.scryfall.com/cards";
 		logger.info("Starting update");
+		long lastScryFallCall = 0L;
 
 		boolean cont = true;
 
 		while (cont) {
+			long timeSpent = System.currentTimeMillis() - lastScryFallCall;
+			if (timeSpent < 50) {
+				try {
+					logger.info("sleeping for {}", 50 - timeSpent);
+					Thread.sleep(50 - timeSpent);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			} else {
+				logger.info("did not sleep");
+			}
 			String result = jsonHelper.getRequest(url);
+			lastScryFallCall = System.currentTimeMillis();
 			if (!StringUtils.isEmpty(result)) {
 				JsonObject jsonObject = new JsonParser().parse(result).getAsJsonObject();
 				String object = jsonObject.has("object") ? jsonObject.get("object").getAsString() : null;
@@ -136,11 +149,6 @@ import java.util.stream.Collectors;
 							card.setLegalities(legality);
 
 							cards.add(card);
-							try {
-								Thread.sleep(50);
-							} catch (InterruptedException e) {
-								e.printStackTrace();
-							}
 							if (cards.size() == 500) {
 								logger.info("Starting saving of " + cards.size() + " cards.");
 								cardRepository.saveAll(cards);

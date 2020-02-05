@@ -177,11 +177,23 @@ import java.util.stream.Collectors;
 		String url = "https://api.scryfall.com/cards";
 
 		logger.info("Starting update");
-
+		long lastScryFallCall = 0L;
 		boolean cont = true;
 		priceArrayList.clear();
 		while (cont) {
+			long timeSpent = System.currentTimeMillis() - lastScryFallCall;
+			if (timeSpent < 50) {
+				try {
+					logger.info("sleeping for {}", 50 - timeSpent);
+					Thread.sleep(50 - timeSpent);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			} else {
+				logger.info("did not sleep");
+			}
 			String result = jsonHelper.getRequest(url);
+			lastScryFallCall = System.currentTimeMillis();
 			if (!StringUtils.isEmpty(result)) {
 				JsonObject jsonObject = new JsonParser().parse(result).getAsJsonObject();
 				String object = jsonObject.has("object") ? jsonObject.get("object").getAsString() : null;
@@ -232,11 +244,6 @@ import java.util.stream.Collectors;
 					} catch (Exception e) {
 						logger.error("Ran into error " + e + ".  With card " + name + "CARD:" + name);
 					}
-				}
-				try {
-					Thread.sleep(50);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
 				}
 			}
 		}
