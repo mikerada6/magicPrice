@@ -1,5 +1,7 @@
 package com.example.mtg.Helper;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -42,4 +44,9 @@ import java.io.IOException;
 		}
 		return result;
 	}
+
+	public JsonObject getJsonObject(String url) {
+		return new JsonParser().parse(getRequest(url)).getAsJsonObject();
+	}
+
 }

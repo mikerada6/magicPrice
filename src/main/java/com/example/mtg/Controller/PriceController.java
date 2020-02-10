@@ -43,6 +43,12 @@ import java.util.stream.Collectors;
 	@Autowired
 	private JSONHelper jsonHelper;
 
+	@GetMapping(path = "/")
+	public @ResponseBody
+	List<Price> getAll() {
+		return priceRepository.findAll();
+	}
+
 	@GetMapping(path = "/history/{cardId}")
 	public @ResponseBody
 	Map<String, Object> history(
@@ -96,11 +102,11 @@ import java.util.stream.Collectors;
 		Date yesterday = subtractDays(today, 1);
 		logger.info("Starting to fetch all the cards");
 		List<Card> cards = cardRepository.findAll();
-		logger.info("All " + cards.size() + " have been retrieved from the database");
+		logger.info("All {} have been retrieved from the database", cards.size());
 		logger.info("Starting to filter");
 		List<Card> standard = cards.stream().filter(c -> c.getLegalities() != null && c.getLegalities().get(format))
 				.collect(Collectors.toList());
-		logger.info("All " + standard.size() + " cards have been filtered from the list");
+		logger.info("All {} cards have been filtered from the list", standard.size());
 		for (Card card : standard) {
 			Map<String, Price> map = card.priceHashMap();
 			if (map.containsKey(today.toString()) && map.containsKey(yesterday.toString())) {
@@ -127,19 +133,19 @@ import java.util.stream.Collectors;
 		return cardRepository.count();
 	}
 
-	@GetMapping(path = "/history/")
+	@GetMapping(path = "/history")
 	public @ResponseBody
 	Map<String, Object> history() {
 		logger.info("Starting to get all cards");
 		List<Card> cards = cardRepository.findAll();
-		logger.info("All " + cards.size() + " have been retrieved from the database");
+		logger.info("All {} have been retrieved from the database", cards.size());
 		HashMap<String, Object> ans = new HashMap<>();
 		HashMap<String, Object> finalAns = new HashMap<>();
 		Collection<Price> prices;
 		logger.info("Starting to loop through all the cards");
 		for (Card card : cards) {
 			if (finalAns.size() % 1000 == 0) {
-				logger.info("We have looped through " + finalAns.size() + "cards so far");
+				logger.info("We have looped through {} cards so far", finalAns.size());
 			}
 			ans.put("card", card.getName());
 			HashMap<String, Object> history = new HashMap<>();
@@ -200,7 +206,7 @@ import java.util.stream.Collectors;
 				int total_cards = jsonObject.has("total_cards") ? jsonObject.get("total_cards").getAsInt() : null;
 				cont = jsonObject.has("has_more") && jsonObject.get("has_more").getAsBoolean();
 				url = jsonObject.has("next_page") && cont ? jsonObject.get("next_page").getAsString() : null;
-				logger.info("Next page is at " + url);
+				logger.info("Next page is at {}", url);
 				JsonArray data = jsonObject.has("data") ? jsonObject.getAsJsonArray("data") : null;
 				for (JsonElement datum : data) {
 					JsonObject temp = datum.getAsJsonObject();
@@ -242,7 +248,7 @@ import java.util.stream.Collectors;
 							}
 						}
 					} catch (Exception e) {
-						logger.error("Ran into error " + e + ".  With card " + name + "CARD:" + name);
+						logger.error("Ran into error {}.  With card {} " + name, e);
 					}
 				}
 			}
@@ -266,14 +272,14 @@ import java.util.stream.Collectors;
 	public void deleteToday() {
 		logger.info("Starting to get all prices");
 		List<Price> prices = priceRepository.findAll();
-		logger.info("All " + prices.size() + " have been retrieved from the database");
+		logger.info("All {} have been retrieved from the database", prices.size());
 		Date today = new java.sql.Date(Calendar.getInstance().getTime().getTime());
 		List<Price> toDelete = prices.stream().filter(p -> p.getDate().toString().equals(today.toString()))
 				.collect(Collectors.toList());
-		logger.info("Found " + toDelete.size() + " that will be deleted");
-		logger.info("Size before delete " + priceRepository.count());
+		logger.info("Found {} that will be deleted", toDelete.size());
+		logger.info("Size before delete {}", priceRepository.count());
 		priceRepository.deleteAll(toDelete);
-		logger.info("Size after delete " + priceRepository.count());
+		logger.info("Size after delete {}", priceRepository.count());
 	}
 
 }

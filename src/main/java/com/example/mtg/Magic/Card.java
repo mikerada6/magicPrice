@@ -1,14 +1,15 @@
 package com.example.mtg.Magic;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
+import org.json.JSONArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.annotation.Id;
 
 import javax.persistence.Entity;
 import javax.persistence.OneToMany;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.sql.Date;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,7 +29,7 @@ import java.util.stream.Collectors;
 	private Color color;
 	private Rarity rarity;
 	private String collector_number;
-	private int cmc;
+	private double cmc;
 	//card type needs to be an array since a card can be of multiple types.  i.e. artifact creature
 	private ArrayList<Type> types;
 	private String set_name;
@@ -38,6 +39,10 @@ import java.util.stream.Collectors;
 	private double printNumber;
 	private boolean promo;
 	private boolean variation;
+	private String lang;
+	private String manaCost;
+	private String uri;
+	private String oracleText;
 
 	public Card() {
 		name = null;
@@ -104,11 +109,11 @@ import java.util.stream.Collectors;
 		this.collector_number = printNumber;
 	}
 
-	public int getCmc() {
+	public double getCmc() {
 		return cmc;
 	}
 
-	public void setCmc(int cmc) {
+	public void setCmc(double cmc) {
 		this.cmc = cmc;
 	}
 
@@ -124,6 +129,74 @@ import java.util.stream.Collectors;
 	public int compareTo(Card o) {
 		//TODO finish
 		return 0;
+	}
+
+	private HashMap<String, Object> createMapping(String methodName, Object dataType) {
+		HashMap<String, Object> temp = new HashMap<>();
+		temp.put("methodName", methodName);
+		temp.put("dataType", dataType);
+		return temp;
+	}
+
+	public boolean setValueString(String variableName, String value) {
+		String methodName = "set" + variableName.substring(0, 1).toUpperCase() + variableName.substring(1);
+		Method method = null;
+		HashMap<String, HashMap<String, Object>> scryFallMapping = new HashMap<>();
+		scryFallMapping.put("name", createMapping("setName", String.class));
+		scryFallMapping.put("id", createMapping("setId", String.class));
+		scryFallMapping.put("type_line", createMapping("setTypeFromScryFall", String.class));
+		scryFallMapping.put("lang", createMapping("setLang", String.class));
+		scryFallMapping.put("rarity", createMapping("setRarity", String.class));
+		scryFallMapping.put("collector_number", createMapping("setCollector_number", String.class));
+		scryFallMapping.put("cmc", createMapping("setCmc", double.class));
+		scryFallMapping.put("released_at", createMapping("setReleased_at", Date.class));
+		scryFallMapping.put("collector_number", createMapping("setCollector_number", String.class));
+		scryFallMapping.put("promo", createMapping("setPromo", boolean.class));
+		scryFallMapping.put("variation", createMapping("setVariation", boolean.class));
+		scryFallMapping.put("set_name", createMapping("setSet_name", String.class));
+		scryFallMapping.put("mana_cost", createMapping("setManaCost", String.class));
+		scryFallMapping.put("uri", createMapping("setURI", String.class));
+		scryFallMapping.put("oracle_text", createMapping("setOracleText", String.class));
+
+		if (!scryFallMapping.containsKey(variableName)) {
+			logger.error("Could not find where to put variable {}.  Error: ", variableName);
+			return false;
+		}
+		Class dataType = (Class) scryFallMapping.get(variableName).get("dataType");
+
+		try {
+			method = Card.class
+					.getDeclaredMethod(scryFallMapping.get(variableName).get("methodName").toString(), dataType);
+		} catch (NoSuchMethodException ex) {
+			logger.error("Could not find method {}.  Error: ", methodName, ex);
+			return false;
+		}
+		try {
+			if (dataType.equals(int.class)) {
+				method.invoke(this, Integer.parseInt(value));
+			} else if (dataType.equals(double.class)) {
+				method.invoke(this, Double.parseDouble(value));
+			} else if (dataType.equals(String.class)) {
+				method.invoke(this, value);
+			} else if (dataType.equals(boolean.class)) {
+				method.invoke(this, Boolean.parseBoolean(value));
+			} else if (dataType.equals(Date.class)) {
+				method.invoke(this, Date.valueOf(value));
+			} else {
+				logger.error("Could not find an action for type {} ", dataType);
+				return false;
+			}
+		} catch (IllegalAccessException ex) {
+			logger.error("IllegalAccessException {}.  Error: ", methodName, ex);
+			return false;
+		} catch (InvocationTargetException ex) {
+			logger.error("IllegalAccessException {}.  Error: ", methodName, ex);
+			return false;
+		} catch (Exception ex) {
+			logger.error("Exception {}.  Error: ", methodName, ex);
+			return false;
+		}
+		return true;
 	}
 
 	public Date getReleased_at() {
@@ -189,10 +262,14 @@ import java.util.stream.Collectors;
 		}
 	}
 
-	public void setColorFromScryFall(JsonArray colors) {
+	public void setColorFromScryFall(JSONArray colors) {
 		int count = 0;
-		for (JsonElement colorElement : colors) {
-			String tempColor = colorElement.getAsString();
+		if (colors.length() == 0) {
+			color = Color.COLORLESS;
+			return;
+		}
+		for (int i = 0; i < colors.length(); i++) {
+			String tempColor = colors.get(i).toString();
 			if (tempColor.equalsIgnoreCase("W")) {
 				color = Color.WHITE;
 				count++;
@@ -292,6 +369,38 @@ import java.util.stream.Collectors;
 
 	public void setVariation(boolean variation) {
 		this.variation = variation;
+	}
+
+	public String getLang() {
+		return lang;
+	}
+
+	public void setLang(String lang) {
+		this.lang = lang;
+	}
+
+	public String getManaCost() {
+		return manaCost;
+	}
+
+	public void setManaCost(String manaCost) {
+		this.manaCost = manaCost;
+	}
+
+	public String getURI() {
+		return uri;
+	}
+
+	public void setURI(String URI) {
+		this.uri = URI;
+	}
+
+	public String getOracleText() {
+		return oracleText;
+	}
+
+	public void setOracleText(String oracleText) {
+		this.oracleText = oracleText;
 	}
 }
 
