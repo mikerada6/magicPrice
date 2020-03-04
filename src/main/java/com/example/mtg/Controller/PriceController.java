@@ -2,6 +2,7 @@ package com.example.mtg.Controller;
 
 import com.example.mtg.Helper.JSONHelper;
 import com.example.mtg.Magic.Card;
+import com.example.mtg.Magic.Change;
 import com.example.mtg.Magic.Price;
 import com.example.mtg.Repository.CardRepository;
 import com.example.mtg.Repository.PriceRepository;
@@ -18,6 +19,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
@@ -26,6 +28,7 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,10 +46,20 @@ import java.util.stream.Collectors;
 	@Autowired
 	private JSONHelper jsonHelper;
 
+	private static Date subtractDays(Date date, int days) {
+		Calendar c = Calendar.getInstance();
+		c.setTime(date);
+		c.add(Calendar.DATE, -days);
+		return new Date(c.getTimeInMillis());
+	}
+
 	@GetMapping(path = "/")
 	public @ResponseBody
 	List<Price> getAll() {
-		return priceRepository.findAll();
+		logger.info("Starting to fetch all the prices");
+		List<Price> prices = priceRepository.findAll();
+		logger.info("All {} have been retrieved from the database", prices.size());
+		return prices;
 	}
 
 	@GetMapping(path = "/history/{cardId}")
@@ -84,61 +97,52 @@ import java.util.stream.Collectors;
 		return ans;
 	}
 
-	private static Date subtractDays(Date date, int days) {
-		Calendar c = Calendar.getInstance();
-		c.setTime(date);
-		c.add(Calendar.DATE, -days);
-		return new Date(c.getTimeInMillis());
-	}
-
 	@GetMapping(path = "/topten/{format}")
 	public @ResponseBody
-	String topTenStandard(
+	List<Change> topTenStandard(
 			@PathVariable("format")
 					String format) {
 		String ans = "";
 		NumberFormat formatter = NumberFormat.getCurrencyInstance();
 		Date today = new java.sql.Date(Calendar.getInstance().getTime().getTime());
 		Date yesterday = subtractDays(today, 1);
-		logger.info("Starting to fetch all the cards");
-		List<Card> cards = cardRepository.findAll();
-		logger.info("All {} have been retrieved from the database", cards.size());
+		Date weekAgo = subtractDays(today, 7);
+		List<Card> cards = getAllCards();
 		logger.info("Starting to filter");
-		List<Card> standard = cards.stream().filter(c -> c.getLegalities() != null && c.getLegalities().get(format))
+		List<Card> cardsInFormat = cards.stream()
+				.filter(c -> c.getLegalities() != null && c.getLegalities().get(format) && !c.isPromo())
 				.collect(Collectors.toList());
-		logger.info("All {} cards have been filtered from the list", standard.size());
-		for (Card card : standard) {
+		logger.info("All {} cards have been filtered from the list", cardsInFormat.size());
+		ArrayList<Change> changes = new ArrayList<Change>();
+		for (Card card : cardsInFormat) {
+			card.getPrice();
+			Change change = new Change();
 			Map<String, Price> map = card.priceHashMap();
-			if (map.containsKey(today.toString()) && map.containsKey(yesterday.toString())) {
-				Double todayPrice = map.get(today.toString()).getUsd();
-				Double yesterdayPrice = map.get(yesterday.toString()).getUsd();
-				double percentChange = ((todayPrice - yesterdayPrice) / yesterdayPrice) * 100;
-				logger.info(card.getName());
-				if (!yesterdayPrice.equals(todayPrice)) {
-					ans += formatter.format(todayPrice - yesterdayPrice);
-					ans += "\t" + card.getName() + "(" + card.getId() + ")\t";
-					ans += formatter.format(todayPrice);
-					ans += "\t" + String.format("%,.2f", percentChange) + "%\n";
-				}
+			if (map.containsKey(today.toString()) && map.containsKey(yesterday.toString()) && map
+					.containsKey(weekAgo.toString())) {
+				change.setCard(card);
+				change.setToday(map.get(today.toString()));
+				change.setYesterday(map.get(yesterday.toString()));
+				change.setWeekAgo(map.get(weekAgo.toString()));
+				changes.add(change);
 			}
 		}
-		System.out.println(ans);
-		return ans;
-
+		List<Change> temp = changes.stream()
+				.filter(c -> c.getToday().getUsd() != null && c.getWeekAgo().getUsd() != null)
+				.sorted(Comparator.comparingDouble(Change::getDailyChange).reversed()).collect(Collectors.toList());
+		return temp.subList(0, 10);
 	}
 
 	@GetMapping(path = "/count")
 	public @ResponseBody
 	long count() {
-		return cardRepository.count();
+		return priceRepository.count();
 	}
 
 	@GetMapping(path = "/history")
 	public @ResponseBody
 	Map<String, Object> history() {
-		logger.info("Starting to get all cards");
-		List<Card> cards = cardRepository.findAll();
-		logger.info("All {} have been retrieved from the database", cards.size());
+		List<Card> cards = getAllCards();
 		HashMap<String, Object> ans = new HashMap<>();
 		HashMap<String, Object> finalAns = new HashMap<>();
 		Collection<Price> prices;
@@ -174,7 +178,78 @@ import java.util.stream.Collectors;
 		return finalAns;
 	}
 
-	@GetMapping(path = "/update")
+	@PostMapping(path = "/extrapolateMissingData")
+	public @ResponseBody
+	String extrapolateMissingData() {
+		List<Price> prices = getAll();
+		Map<String, List<Price>> priceMap = prices.stream().collect(Collectors.groupingBy(t -> t.getCard().getId()));
+		Date start = Date.valueOf("2020-02-21");
+		Date end = Date.valueOf("2020-02-24");
+		Map<String, List<Price>> startPriceMap = prices.stream().filter(p -> p.getDate().equals(start))
+				.collect(Collectors.groupingBy(t -> t.getCard().getId()));
+		Map<String, List<Price>> endPriceMap = prices.stream().filter(p -> p.getDate().equals(end))
+				.collect(Collectors.groupingBy(t -> t.getCard().getId()));
+
+		ArrayList<String> both = new ArrayList<>();
+		both.addAll(startPriceMap.keySet());
+		both.addAll(endPriceMap.keySet());
+		Set<String> set = both.stream().filter(s -> endPriceMap.containsKey(s) && startPriceMap.containsKey(s))
+				.collect(Collectors.toSet());
+		Date day1 = Date.valueOf("2020-02-22");
+		Date day2 = Date.valueOf("2020-02-23");
+		ArrayList<Price> priceUpdates = new ArrayList<>();
+		for (String key : set) {
+
+			Price a = startPriceMap.get(key).get(0);
+			Price b = endPriceMap.get(key).get(0);
+			logger.info("Adding price data for {}", a.getCard().getName());
+			Price one = new Price();
+			Price two = new Price();
+
+			Card c = cardRepository.findById(a.getCard().getId()).orElse(null);
+			one.setCard(c);
+			one.setDate(day1);
+			two.setCard(c);
+			two.setDate(day2);
+			double usd = a.getUsd() > 0 && b.getUsd() > 0 ? linearize(0, a.getUsd(), 2, a.getUsd(), 1) : -1;
+			double usd_foil = a.getUsd_foil() > 0 && b.getUsd_foil() > 0 ?
+					linearize(0, a.getUsd_foil(), 2, a.getUsd_foil(), 1) :
+					-1;
+			double tix = a.getTix() > 0 && b.getTix() > 0 ? linearize(0, a.getTix(), 2, a.getTix(), 1) : -1;
+			double eur = a.getEur() > 0 && b.getEur() > 0 ? linearize(0, a.getEur(), 2, a.getEur(), 1) : -1;
+			one.setUsd(usd);
+			one.setUsd_foil(usd_foil);
+			one.setTix(tix);
+			one.setEur(eur);
+
+			usd = a.getUsd() > 0 && b.getUsd() > 0 ? linearize(0, a.getUsd(), 2, a.getUsd(), 2) : -1;
+			usd_foil = a.getUsd_foil() > 0 && b.getUsd_foil() > 0 ?
+					linearize(0, a.getUsd_foil(), 2, a.getUsd_foil(), 2) :
+					-1;
+			tix = a.getTix() > 0 && b.getTix() > 0 ? linearize(0, a.getTix(), 2, a.getTix(), 2) : -1;
+			eur = a.getEur() > 0 && b.getEur() > 0 ? linearize(0, a.getEur(), 2, a.getEur(), 2) : -1;
+			two.setUsd(usd);
+			two.setUsd_foil(usd_foil);
+			two.setTix(tix);
+			two.setEur(eur);
+
+			priceUpdates.add(one);
+			priceUpdates.add(two);
+			if (priceUpdates.size() > 500) {
+				logger.info("Saving prices");
+				priceRepository.saveAll(priceUpdates);
+				priceUpdates.clear();
+
+			}
+		}
+		logger.info("Saving prices leftover");
+		priceRepository.saveAll(priceUpdates);
+		priceUpdates.clear();
+		logger.info("done");
+		return "done";
+	}
+
+	@PostMapping(path = "/today")
 	public @ResponseBody
 	String update() {
 		ArrayList<Price> priceArrayList = new ArrayList<Price>();
@@ -188,10 +263,11 @@ import java.util.stream.Collectors;
 		priceArrayList.clear();
 		while (cont) {
 			long timeSpent = System.currentTimeMillis() - lastScryFallCall;
-			if (timeSpent < 50) {
+			int minTime = 100;
+			if (timeSpent < minTime) {
 				try {
-					logger.info("sleeping for {}", 50 - timeSpent);
-					Thread.sleep(50 - timeSpent);
+					logger.info("sleeping for {}", minTime - timeSpent);
+					Thread.sleep(minTime - timeSpent);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -217,8 +293,8 @@ import java.util.stream.Collectors;
 
 					String name = temp.has("name") ? temp.get("name").getAsString() : null;
 					try {
-						String languare = temp.has("lang") ? temp.get("lang").getAsString() : "";
-						if (!languare.equalsIgnoreCase("en")) {
+						String language = temp.has("lang") ? temp.get("lang").getAsString() : "";
+						if (!language.equalsIgnoreCase("en")) {
 							continue;
 						}
 						String cardId = temp.has("id") ? temp.get("id").getAsString() : null;
@@ -233,10 +309,10 @@ import java.util.stream.Collectors;
 						Double eur = getPrice(temp, "eur");
 
 						price.setDate(new java.sql.Date(Calendar.getInstance().getTime().getTime()));
-						price.setUsd(usd);
-						price.setUsd_foil(usd_foil);
-						price.setTix(tix);
-						price.setEur(eur);
+						price.setUsd(usd == -1.0 ? null : usd);
+						price.setUsd_foil(usd_foil == -1.0 ? null : usd_foil);
+						price.setTix(tix == -1.0 ? null : tix);
+						price.setEur(eur == -1.0 ? null : eur);
 						if (usd + usd_foil + tix + eur > -4) {
 							//only save a price if its not all null
 							priceArrayList.add(price);
@@ -268,11 +344,10 @@ import java.util.stream.Collectors;
 		return -1.0;
 	}
 
-	@DeleteMapping(path = "/delete/today")
+	@DeleteMapping(path = "/today")
 	public void deleteToday() {
 		logger.info("Starting to get all prices");
-		List<Price> prices = priceRepository.findAll();
-		logger.info("All {} have been retrieved from the database", prices.size());
+		List<Price> prices = getAll();
 		Date today = new java.sql.Date(Calendar.getInstance().getTime().getTime());
 		List<Price> toDelete = prices.stream().filter(p -> p.getDate().toString().equals(today.toString()))
 				.collect(Collectors.toList());
@@ -280,6 +355,37 @@ import java.util.stream.Collectors;
 		logger.info("Size before delete {}", priceRepository.count());
 		priceRepository.deleteAll(toDelete);
 		logger.info("Size after delete {}", priceRepository.count());
+		return;
 	}
 
+	@DeleteMapping(path = "/cleanup")
+	public List<Price> cleanup() {
+		logger.info("Starting cleanup prices");
+		List<Price> prices = getAll();
+		ArrayList<Price> deleteThese = new ArrayList<>();
+		Map<String, List<Price>> map = prices.stream()
+				.collect(Collectors.groupingBy(s -> s.getCard().getId() + "|" + s.getDate().toString()));
+		List<Price> temp = map.entrySet().stream().filter(s -> s.getValue().size() > 1).map(s -> s.getValue().get(0))
+				.collect(Collectors.toList());
+		logger.info("Found {} that will be deleted", temp.size());
+		logger.info("Size before delete {}", priceRepository.count());
+		priceRepository.deleteAll(temp);
+		logger.info("Size after delete {}", priceRepository.count());
+		return temp;
+	}
+
+	private double linearize(double x1, double y1, double x2, double y2, double input) {
+		if (x2 == x1)
+			return x1;
+		double slope = (y2 - y1) / (x2 - x1);
+		double b = y2 - slope * x1;
+		return input * slope + b;
+	}
+
+	private List<Card> getAllCards() {
+		logger.info("Starting to fetch all the cards");
+		List<Card> cards = cardRepository.findAll();
+		logger.info("All {} have been retrieved from the database", cards.size());
+		return cards;
+	}
 }

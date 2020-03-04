@@ -47,6 +47,12 @@ import java.util.List;
 		return cardRepository.findById(cardId).orElseThrow(() -> new ResourceNotFoundException());
 	}
 
+	@GetMapping(path = "/count")
+	public @ResponseBody
+	long count() {
+		return cardRepository.count();
+	}
+
 	@GetMapping(path = "")
 	public @ResponseBody
 	List<Card> getAllCards() {

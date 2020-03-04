@@ -10,4 +10,6 @@ public interface PriceRepository extends CrudRepository<Price, Long> {
 	List<Price> findAll();
 
 	Set<Price> findAllByCardId(String cardId);
+
+	void deleteByIdIn(List<Long> ids);
 }

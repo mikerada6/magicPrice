@@ -95,6 +95,15 @@ import static org.mockito.Mockito.when;
 	}
 
 	@Test
+	public void countTest() {
+
+		when(cardRepository.count()).thenReturn((long) 5);
+		long count = cardController.count();
+		Mockito.verify(cardRepository, Mockito.times(1)).count();
+		Assert.assertEquals(5, count);
+	}
+
+	@Test
 	public void updateTest() {
 		String url = "https://api.scryfall.com/cards";
 		String url2 = "https://api.scryfall.com/cards?page=2";
