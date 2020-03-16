@@ -68,7 +68,7 @@ import java.util.List;
 		return cardRepository.save(c);
 	}
 
-	@GetMapping(path = "/update")
+	@PostMapping(path = "/today")
 	public @ResponseBody
 	ArrayList<Card> update() {
 		ArrayList<Card> cards = new ArrayList<Card>();
@@ -97,7 +97,6 @@ import java.util.List;
 				JSONObject jsonObject = getJsonObject(result);
 				cont = jsonObject.has("has_more") && jsonObject.getBoolean("has_more");
 				url = jsonObject.has("next_page") && cont ? jsonObject.getString("next_page") : null;
-				logger.info("Next page is at {}", url);
 				JSONArray data = jsonObject.has("data") ? jsonObject.getJSONArray("data") : null;
 
 				int stop = 0;

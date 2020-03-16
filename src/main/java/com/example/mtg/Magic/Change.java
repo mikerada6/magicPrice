@@ -39,6 +39,14 @@ public class Change {
 	}
 
 	public double getDailyChange() {
+		if (this.getToday().getUsd() != null && this.getYesterday().getUsd() != null) {
+			return this.getToday().getUsd() - this.getYesterday().getUsd();
+		}
+		return -666;
+
+	}
+
+	public double getWeeklyChange() {
 		if (this.getToday().getUsd() != null && this.getWeekAgo().getUsd() != null) {
 			return this.getToday().getUsd() - this.getWeekAgo().getUsd();
 		}

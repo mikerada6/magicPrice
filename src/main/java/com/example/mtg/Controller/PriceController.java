@@ -180,11 +180,11 @@ import java.util.stream.Collectors;
 
 	@PostMapping(path = "/extrapolateMissingData")
 	public @ResponseBody
-	String extrapolateMissingData() {
+	String extrapolateMissingData(String startDate, String endDate) {
 		List<Price> prices = getAll();
 		Map<String, List<Price>> priceMap = prices.stream().collect(Collectors.groupingBy(t -> t.getCard().getId()));
-		Date start = Date.valueOf("2020-02-21");
-		Date end = Date.valueOf("2020-02-24");
+		Date start = Date.valueOf(startDate);
+		Date end = Date.valueOf(endDate);
 		Map<String, List<Price>> startPriceMap = prices.stream().filter(p -> p.getDate().equals(start))
 				.collect(Collectors.groupingBy(t -> t.getCard().getId()));
 		Map<String, List<Price>> endPriceMap = prices.stream().filter(p -> p.getDate().equals(end))
@@ -196,7 +196,10 @@ import java.util.stream.Collectors;
 		Set<String> set = both.stream().filter(s -> endPriceMap.containsKey(s) && startPriceMap.containsKey(s))
 				.collect(Collectors.toSet());
 		Date day1 = Date.valueOf("2020-02-22");
-		Date day2 = Date.valueOf("2020-02-23");
+		Calendar cal = Calendar.getInstance();
+		cal.setTime(start);
+		cal.add(Calendar.DATE, 1);
+		Date newDate = new Date(cal.getTimeInMillis());
 		ArrayList<Price> priceUpdates = new ArrayList<>();
 		for (String key : set) {
 
@@ -204,13 +207,10 @@ import java.util.stream.Collectors;
 			Price b = endPriceMap.get(key).get(0);
 			logger.info("Adding price data for {}", a.getCard().getName());
 			Price one = new Price();
-			Price two = new Price();
 
 			Card c = cardRepository.findById(a.getCard().getId()).orElse(null);
 			one.setCard(c);
 			one.setDate(day1);
-			two.setCard(c);
-			two.setDate(day2);
 			double usd = a.getUsd() > 0 && b.getUsd() > 0 ? linearize(0, a.getUsd(), 2, a.getUsd(), 1) : -1;
 			double usd_foil = a.getUsd_foil() > 0 && b.getUsd_foil() > 0 ?
 					linearize(0, a.getUsd_foil(), 2, a.getUsd_foil(), 1) :
@@ -228,13 +228,8 @@ import java.util.stream.Collectors;
 					-1;
 			tix = a.getTix() > 0 && b.getTix() > 0 ? linearize(0, a.getTix(), 2, a.getTix(), 2) : -1;
 			eur = a.getEur() > 0 && b.getEur() > 0 ? linearize(0, a.getEur(), 2, a.getEur(), 2) : -1;
-			two.setUsd(usd);
-			two.setUsd_foil(usd_foil);
-			two.setTix(tix);
-			two.setEur(eur);
 
 			priceUpdates.add(one);
-			priceUpdates.add(two);
 			if (priceUpdates.size() > 500) {
 				logger.info("Saving prices");
 				priceRepository.saveAll(priceUpdates);
@@ -266,8 +261,10 @@ import java.util.stream.Collectors;
 			int minTime = 100;
 			if (timeSpent < minTime) {
 				try {
-					logger.info("sleeping for {}", minTime - timeSpent);
+					double sleepTime = minTime - timeSpent;
+					logger.info("sleeping for {}", sleepTime);
 					Thread.sleep(minTime - timeSpent);
+					logger.trace("done sleeping");
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -282,7 +279,6 @@ import java.util.stream.Collectors;
 				int total_cards = jsonObject.has("total_cards") ? jsonObject.get("total_cards").getAsInt() : null;
 				cont = jsonObject.has("has_more") && jsonObject.get("has_more").getAsBoolean();
 				url = jsonObject.has("next_page") && cont ? jsonObject.get("next_page").getAsString() : null;
-				logger.info("Next page is at {}", url);
 				JsonArray data = jsonObject.has("data") ? jsonObject.getAsJsonArray("data") : null;
 				for (JsonElement datum : data) {
 					JsonObject temp = datum.getAsJsonObject();
@@ -346,7 +342,6 @@ import java.util.stream.Collectors;
 
 	@DeleteMapping(path = "/today")
 	public void deleteToday() {
-		logger.info("Starting to get all prices");
 		List<Price> prices = getAll();
 		Date today = new java.sql.Date(Calendar.getInstance().getTime().getTime());
 		List<Price> toDelete = prices.stream().filter(p -> p.getDate().toString().equals(today.toString()))

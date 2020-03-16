@@ -7,11 +7,14 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
 @Component public class JSONHelper {
+	private static final Logger logger = LoggerFactory.getLogger(JSONHelper.class);
 
 	private final CloseableHttpClient httpClient;
 
@@ -20,6 +23,7 @@ import java.io.IOException;
 	}
 
 	public String getRequest(String url) {
+		logger.info("Getting info from {}.", url);
 		String result = null;
 
 		HttpGet request = new HttpGet(url);
@@ -36,10 +40,13 @@ import java.io.IOException;
 			}
 
 		} catch (ClientProtocolException e) {
+			logger.error("ClientProtocolException {}", e);
 			e.printStackTrace();
 		} catch (IOException e) {
+			logger.error("IOException {}", e);
 			e.printStackTrace();
 		}
+		logger.trace("Got result {}: ", result);
 		return result;
 	}
 
