@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Controller @RequestMapping(path = "/cards") public class CardController {
 
@@ -60,6 +61,14 @@ import java.util.List;
 		List<Card> cards = cardRepository.findAll();
 		logger.info("All {} have been retrieved from the database", cards.size());
 		return cards;
+	}
+
+	@GetMapping("/sets")
+	public @ResponseBody
+	List<String> getAllSets() {
+		ArrayList<String> sets = new ArrayList<>();
+		List<Card> cards = getAllCards();
+		return cards.stream().map(c -> c.getSet_name()).collect(Collectors.toList());
 	}
 
 	@PostMapping(path = "/card")

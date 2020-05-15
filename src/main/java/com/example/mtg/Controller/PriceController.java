@@ -242,6 +242,7 @@ import java.util.stream.Collectors;
 		priceUpdates.clear();
 		logger.info("done");
 		return "done";
+
 	}
 
 	@PostMapping(path = "/today")
@@ -258,7 +259,7 @@ import java.util.stream.Collectors;
 		priceArrayList.clear();
 		while (cont) {
 			long timeSpent = System.currentTimeMillis() - lastScryFallCall;
-			int minTime = 100;
+			int minTime = 125;
 			if (timeSpent < minTime) {
 				try {
 					double sleepTime = minTime - timeSpent;
@@ -271,8 +272,8 @@ import java.util.stream.Collectors;
 			} else {
 				logger.info("did not sleep");
 			}
-			String result = jsonHelper.getRequest(url);
 			lastScryFallCall = System.currentTimeMillis();
+			String result = jsonHelper.getRequest(url);
 			if (!StringUtils.isEmpty(result)) {
 				JsonObject jsonObject = new JsonParser().parse(result).getAsJsonObject();
 				String object = jsonObject.has("object") ? jsonObject.get("object").getAsString() : null;
@@ -341,16 +342,24 @@ import java.util.stream.Collectors;
 	}
 
 	@DeleteMapping(path = "/today")
-	public void deleteToday() {
-		List<Price> prices = getAll();
+	public @ResponseBody
+	Set<Price> deleteToday() {
+		//		List<Price> prices = getAll();
 		Date today = new java.sql.Date(Calendar.getInstance().getTime().getTime());
-		List<Price> toDelete = prices.stream().filter(p -> p.getDate().toString().equals(today.toString()))
-				.collect(Collectors.toList());
-		logger.info("Found {} that will be deleted", toDelete.size());
-		logger.info("Size before delete {}", priceRepository.count());
-		priceRepository.deleteAll(toDelete);
-		logger.info("Size after delete {}", priceRepository.count());
-		return;
+		//		List<Price> toDelete = prices.stream().filter(p -> p.getDate().toString().equals(today.toString()))
+		//				.collect(Collectors.toList());
+		//		logger.info("Found {} that will be deleted", toDelete.size());
+		//		logger.info("Size before delete {}", priceRepository.count());
+		//		priceRepository.deleteAll(toDelete);
+		//		logger.info("Size after delete {}", priceRepository.count());
+		//		return;
+		logger.info("Starting to fetch all the prices from {} ", today.toString());
+		Set<Price> todays = priceRepository.findAllByDate(today);
+		logger.info("All {} have been retrieved from the database", todays.size());
+		logger.info("Start to delete");
+		priceRepository.deleteAll(todays);
+		logger.info("End delete");
+		return todays;
 	}
 
 	@DeleteMapping(path = "/cleanup")
