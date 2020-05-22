@@ -43,6 +43,9 @@ import java.util.stream.Collectors;
 	private String manaCost;
 	private String uri;
 	private String oracleText;
+	private String set;
+	@JsonIgnore
+	private Collection<CardPurchaseAssociation> cardPurchaseAssociation;
 
 	public Card() {
 		name = null;
@@ -157,6 +160,7 @@ import java.util.stream.Collectors;
 		scryFallMapping.put("mana_cost", createMapping("setManaCost", String.class));
 		scryFallMapping.put("uri", createMapping("setURI", String.class));
 		scryFallMapping.put("oracle_text", createMapping("setOracleText", String.class));
+		scryFallMapping.put("set",createMapping("setSet", String.class));
 
 		if (!scryFallMapping.containsKey(variableName)) {
 			logger.error("Could not find where to put variable {}.  Error: ", variableName);
@@ -401,6 +405,47 @@ import java.util.stream.Collectors;
 
 	public void setOracleText(String oracleText) {
 		this.oracleText = oracleText;
+	}
+
+	public void setSet(String set)
+	{
+		this.set=set;
+	}
+
+	public String getSet()
+	{
+		return set;
+	}
+
+	@OneToMany(mappedBy = "card")
+	public Collection<CardPurchaseAssociation> getCardPurchaseAssociation() {
+		return cardPurchaseAssociation;
+	}
+
+	public void setCardPurchaseAssociation(Collection<CardPurchaseAssociation> cardPurchaseAssociation) {
+		this.cardPurchaseAssociation = cardPurchaseAssociation;
+	}
+
+	/**
+	 * This method will take the collector number that is given to us by scryfall and convert it to an int removing
+	 * all non integerß numbers
+	 * @return
+	 */
+	public int convertCollectorNumber()
+	{
+		String temp ="";
+		String[] split = collector_number.split("");
+
+		for(String a : split)
+		{
+			try{
+				temp+= Integer.parseInt(a);
+			}catch(Exception e)
+			{
+
+			}
+		}
+		return Integer.parseInt(temp);
 	}
 }
 

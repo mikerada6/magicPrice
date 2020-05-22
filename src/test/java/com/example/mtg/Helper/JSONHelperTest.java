@@ -1,36 +1,36 @@
 package com.example.mtg.Helper;
 
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnit;
-import org.mockito.junit.MockitoRule;
-import org.springframework.test.util.ReflectionTestUtils;
+
+import static org.junit.Assert.assertEquals;
 
 public class JSONHelperTest {
 
-	@Rule
-	public MockitoRule mockitoRule = MockitoJUnit.rule();
-
-	@Mock
-	CloseableHttpClient httpClient;
-	JSONHelper jsonHelper;
+	private JSONHelper jsonHelperUnderTest;
 
 	@Before
-	public void setup() {
-		jsonHelper = new JSONHelper();
-		httpClient = HttpClients.createDefault();
-		ReflectionTestUtils.setField(jsonHelper, "httpClient", httpClient);
+	public void setUp() {
+		jsonHelperUnderTest = new JSONHelper();
 	}
 
 	@Test
-	public void testOne() {
-		Assert.assertEquals(1, 1);
-		String one = "https://api.scryfall.com/cards?page=2";
-		jsonHelper.getRequest(one);
+	public void testGetRequest() throws JSONException {
+		// Setup
+
+		// Run the test
+		final String result = jsonHelperUnderTest.getRequest("https://api.scryfall.com/cards");
+		JSONObject json= null;
+		try {
+			json = new JSONObject(result);
+		} catch (JSONException e) {
+			Assert.fail("reason: " + e);
+		}
+		// Verify the results
+		Assert.assertTrue(json.has("object"));
+		Assert.assertEquals("list",json.get("object"));
 	}
 }

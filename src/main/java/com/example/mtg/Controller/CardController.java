@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,16 +30,13 @@ import java.util.stream.Collectors;
 	private static final Logger logger = LoggerFactory.getLogger(CardController.class);
 
 	@Autowired
-	Environment env;
-
-	@Autowired
 	private CardRepository cardRepository;
 
 	@Autowired
 	private JSONHelper jsonHelper;
 
 	private static final String[] fieldsToBeUsed = { "name", "id", "type_line", "lang", "rarity", "collector_number",
-			"cmc", "released_at", "promo", "variation", "set_name", "mana_cost", "uri", "oracle_text" };
+			"cmc", "released_at", "promo", "variation", "set_name", "mana_cost", "uri", "oracle_text", "set" };
 
 	@GetMapping(path = "/{cardId}")
 	public @ResponseBody
@@ -48,11 +46,26 @@ import java.util.stream.Collectors;
 		return cardRepository.findById(cardId).orElseThrow(() -> new ResourceNotFoundException());
 	}
 
-	@GetMapping(path = "/count")
+	@DeleteMapping(path = "/{cardId}")
 	public @ResponseBody
-	long count() {
-		return cardRepository.count();
+	void deleteCard(
+			@PathVariable("cardId")
+					String cardId) {
+		cardRepository.deleteById(cardId);
+		return;
 	}
+	@PostMapping(path = "/{cardId}")
+	public @ResponseBody
+	Card addCard(
+			@PathVariable("cardId")
+					String cardId) {
+		String url = "https://api.scryfall.com/cards/"+cardId;
+		Card c = new Card();
+		String result = jsonHelper.getRequest(url);
+		return c;
+	}
+
+
 
 	@GetMapping(path = "")
 	public @ResponseBody
@@ -63,15 +76,8 @@ import java.util.stream.Collectors;
 		return cards;
 	}
 
-	@GetMapping("/sets")
-	public @ResponseBody
-	List<String> getAllSets() {
-		ArrayList<String> sets = new ArrayList<>();
-		List<Card> cards = getAllCards();
-		return cards.stream().map(c -> c.getSet_name()).collect(Collectors.toList());
-	}
 
-	@PostMapping(path = "/card")
+	@PostMapping(path = "")
 	public @ResponseBody
 	Card addCard(Card c) {
 		return cardRepository.save(c);
@@ -99,11 +105,11 @@ import java.util.stream.Collectors;
 			} else {
 				logger.info("did not sleep");
 			}
-			String result = "go";
+			String result = "";
 			lastScryFallCall = System.currentTimeMillis();
 			if (!StringUtils.isEmpty(result)) {
 				result = jsonHelper.getRequest(url);
-				JSONObject jsonObject = getJsonObject(result);
+				JSONObject jsonObject = JSONHelper.getJsonObject(result);
 				cont = jsonObject.has("has_more") && jsonObject.getBoolean("has_more");
 				url = jsonObject.has("next_page") && cont ? jsonObject.getString("next_page") : null;
 				JSONArray data = jsonObject.has("data") ? jsonObject.getJSONArray("data") : null;
@@ -170,8 +176,6 @@ import java.util.stream.Collectors;
 		return ans;
 	}
 
-	public JSONObject getJsonObject(String jsonString) {
-		return new JSONObject(jsonString);
-	}
+
 
 }

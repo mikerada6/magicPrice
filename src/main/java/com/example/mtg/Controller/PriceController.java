@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -242,7 +243,64 @@ import java.util.stream.Collectors;
 		priceUpdates.clear();
 		logger.info("done");
 		return "done";
+	}
+	@GetMapping(path="/change/set/{set}")
+	public @ResponseBody
+	List<HashMap<String, String>> getsetChange(@PathVariable("set")
+			String set)
+	{
+		List<HashMap<String, String>> maps = new ArrayList<HashMap<String, String>>();
+		List<Card> cards = cardRepository.findAllBySet(set);
+		for(Card card: cards)
+		{
+			try {
+				maps.add(getCardChange(card.getId()));
+			}catch(Exception e)
+			{
+				logger.error("Had an error with card {}. Id of {}", card.getName(), card.getId());
+			}
+		}
+		maps = maps.stream().filter(c -> c.containsKey("daily")).sorted((a, b) -> a.get("daily").compareTo(b.get("daily")))
+				.collect(Collectors.toList());
+		return maps;
+	}
 
+	@GetMapping(path="/change/card/{cardId}")
+	public @ResponseBody
+	HashMap<String,String> getCardChange(@PathVariable("cardId")
+			String cardId)
+	{
+		Locale locale = new Locale("en", "US");
+		NumberFormat currencyFormatter = NumberFormat.getCurrencyInstance(locale);
+		HashMap<String,String> map = new HashMap<>();
+		Card card = cardRepository.findById(cardId).orElseThrow(() -> new ResourceNotFoundException());
+		map.put("card",card.getName());
+		map.put("set", card.getSet().toUpperCase());
+		map.put("rarity", card.getRarity().toString());
+		Date today = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
+		Date yesteday = subtractDays(today,1);
+		Date weekago = subtractDays(today,7);
+		Price todayPrice = priceRepository.findByDateAndAndCard(today, card).orElse(null);
+		Price yestedayPrice = priceRepository.findByDateAndAndCard(yesteday, card).orElse(null);
+		Price weekagoPrice = priceRepository.findByDateAndAndCard(weekago, card).orElse(null);
+		if(todayPrice !=null)
+		{
+			map.put("price",currencyFormatter.format(todayPrice.getUsd()));
+		}
+		if(todayPrice !=null && yestedayPrice!=null)
+		{
+			double temp = yestedayPrice.getUsd()-todayPrice.getUsd();
+			map.put("daily",(currencyFormatter.format(temp)));
+			map.put("dailyPercent",(temp/todayPrice.getUsd())+"");
+		}
+		if(todayPrice !=null && weekagoPrice!=null)
+		{
+			double temp = weekagoPrice.getUsd()-todayPrice.getUsd();
+			map.put("weekly",(currencyFormatter.format(temp)));
+			map.put("weeklyPercent",(temp/todayPrice.getUsd())+"");
+		}
+
+		return map;
 	}
 
 	@PostMapping(path = "/today")
@@ -259,7 +317,7 @@ import java.util.stream.Collectors;
 		priceArrayList.clear();
 		while (cont) {
 			long timeSpent = System.currentTimeMillis() - lastScryFallCall;
-			int minTime = 125;
+			int minTime = 200;
 			if (timeSpent < minTime) {
 				try {
 					double sleepTime = minTime - timeSpent;
@@ -275,7 +333,14 @@ import java.util.stream.Collectors;
 			lastScryFallCall = System.currentTimeMillis();
 			String result = jsonHelper.getRequest(url);
 			if (!StringUtils.isEmpty(result)) {
-				JsonObject jsonObject = new JsonParser().parse(result).getAsJsonObject();
+				JsonObject jsonObject=null;
+				try {
+					jsonObject = new JsonParser().parse(result).getAsJsonObject();
+				}catch(Exception e)
+				{
+					System.out.println("Result: " + result);
+					int errorOut=0/0;
+				}
 				String object = jsonObject.has("object") ? jsonObject.get("object").getAsString() : null;
 				int total_cards = jsonObject.has("total_cards") ? jsonObject.get("total_cards").getAsInt() : null;
 				cont = jsonObject.has("has_more") && jsonObject.get("has_more").getAsBoolean();
