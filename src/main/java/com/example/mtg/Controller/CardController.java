@@ -97,7 +97,8 @@ import java.util.List;
 	@GetMapping(path = "/progress")
 	public @ResponseBody
 	String progressTest() {
-		ProgressBar pb = new ProgressBar("Downloading the internet", 2000) return "done";
+		ProgressBar pb = new ProgressBar("Downloading the internet", 2000);
+		return"done";
 	}
 
 	//	@PostMapping(path = "/today")
