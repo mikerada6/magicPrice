@@ -2,6 +2,7 @@ package com.example.mtg.Repository;
 
 import com.example.mtg.Magic.Card;
 import com.example.mtg.Magic.Price;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
@@ -20,4 +21,9 @@ import java.util.Set;
 	Optional<Price> findByDateAndAndCard(Date date, Card card);
 
 	void deleteByIdIn(List<Long> ids);
+
+	//	List<Date> findDistinctDate();
+
+	@Query(value = "SELECT DISTINCT date FROM price", nativeQuery = true)
+	List<Date> findAllDate();
 }

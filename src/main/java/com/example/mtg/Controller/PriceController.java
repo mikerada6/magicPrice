@@ -428,19 +428,27 @@ import java.util.stream.Collectors;
 	}
 
 	@DeleteMapping(path = "/cleanup")
-	public List<Price> cleanup() {
+	public @ResponseBody
+	List<Price> cleanup() {
 		logger.info("Starting cleanup prices");
-		List<Price> prices = getAll();
-		ArrayList<Price> deleteThese = new ArrayList<>();
-		Map<String, List<Price>> map = prices.stream()
-				.collect(Collectors.groupingBy(s -> s.getCard().getId() + "|" + s.getDate().toString()));
-		List<Price> temp = map.entrySet().stream().filter(s -> s.getValue().size() > 1).map(s -> s.getValue().get(0))
-				.collect(Collectors.toList());
-		logger.info("Found {} that will be deleted", temp.size());
+		List<Date> dates = priceRepository.findAllDate();
+		ArrayList<Price> toDelete = new ArrayList<Price>();
+		for (Date date : dates) {
+			Set<Price> prices = priceRepository.findAllByDate(date);
+			ArrayList<Price> deleteThese = new ArrayList<>();
+			Map<String, List<Price>> map = prices.stream()
+					.collect(Collectors.groupingBy(s -> s.getCard().getId() + "|" + s.getDate().toString()));
+			List<Price> temp = map.entrySet().stream().filter(s -> s.getValue().size() > 1)
+					.map(s -> s.getValue().get(0)).collect(Collectors.toList());
+			logger.info("Found {} that will be deleted for date {}", temp.size(), date.toString());
+			toDelete.addAll(temp);
+
+		}
+		logger.info("Going to delete a total of {} records", toDelete.size());
 		logger.info("Size before delete {}", priceRepository.count());
-		priceRepository.deleteAll(temp);
+		priceRepository.deleteAll(toDelete);
 		logger.info("Size after delete {}", priceRepository.count());
-		return temp;
+		return toDelete;
 	}
 
 	private double linearize(double x1, double y1, double x2, double y2, double input) {

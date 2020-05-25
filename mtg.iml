@@ -13,6 +13,7 @@
         <datasource-mapping>
           <factory-entry name="Entities" />
           <factory-entry name="entityManagerFactory" />
+          <factory-entry name="mtg" />
         </datasource-mapping>
         <naming-strategy-map />
       </configuration>
@@ -152,6 +153,12 @@
     <orderEntry type="library" scope="TEST" name="Maven: junit:junit:4.13" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: org.hamcrest:hamcrest-core:2.1" level="project" />
     <orderEntry type="library" name="Maven: org.json:json:20190722" level="project" />
+    <orderEntry type="library" name="Maven: com.googlecode.json-simple:json-simple:1.1" level="project" />
+    <orderEntry type="library" name="Maven: me.tongfei:progressbar:0.8.1" level="project" />
+    <orderEntry type="library" name="Maven: org.jline:jline:3.13.3" level="project" />
+    <orderEntry type="library" name="Maven: org.jline:jline-terminal-jansi:3.13.3" level="project" />
+    <orderEntry type="library" name="Maven: org.fusesource.jansi:jansi:1.18" level="project" />
+    <orderEntry type="library" name="Maven: org.jline:jline-terminal:3.13.3" level="project" />
   </component>
   <component name="sonarModuleSettings">
     <option name="localAnalysisScripName" value="&lt;PROJECT&gt;" />
