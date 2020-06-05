@@ -20,7 +20,6 @@ public class DomainUtils {
 			c.setRarity(Rarity.RARE);
 			c.setCollector_number("63");
 			c.setCmc(9);
-			c.setTypes(new ArrayList<Type>(Arrays.asList(Type.SORCERY)));
 			c.setName("Commander 2019");
 			c.setReleased_at(Date.valueOf("2019-08-23"));
 			c.setPrintNumber(0);

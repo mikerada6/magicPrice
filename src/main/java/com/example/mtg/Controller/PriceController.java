@@ -3,27 +3,28 @@ package com.example.mtg.Controller;
 import com.example.mtg.Helper.JSONHelper;
 import com.example.mtg.Helper.ScryfallHelper;
 import com.example.mtg.Magic.Card;
-import com.example.mtg.Magic.Change;
 import com.example.mtg.Magic.Price;
 import com.example.mtg.Repository.CardRepository;
 import com.example.mtg.Repository.PriceRepository;
 import com.example.mtg.ResourceNotFoundException;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import me.tongfei.progressbar.ProgressBar;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.sql.Date;
 import java.text.NumberFormat;
 import java.util.*;
@@ -61,6 +62,35 @@ public class PriceController {
         return prices;
     }
 
+    @GetMapping(path = "/short", produces = "text/csv")
+    public @ResponseBody
+    String getAllShort() throws IOException {
+        FileWriter csvWriter = new FileWriter("new.csv");
+        StringBuffer stringBuffer = new StringBuffer();
+        List<Card> cards = getAllCards();
+        csvWriter.append("cardId,date,usd,usd_foil,eur,tix" + System.lineSeparator());
+//        cards = cards.stream().filter(c -> c.getSet().equals("iko")).collect(Collectors.toList());
+        ProgressBar pb = new ProgressBar("Generating data", cards.size());
+        for (Card card : cards) {
+            pb.step();
+            Collection<Price> prices = card.getPrice();
+            for (Price price : prices) {
+                String row = card.getId() + "," + price.getDate() + ",";
+
+                row += price.getUsd() == null ? "," : price.getUsd() + ",";
+                row += price.getUsd_foil() == null ? "," : price.getUsd_foil() + ",";
+                row += price.getEur() == null ? "," : price.getEur() + ",";
+                row += price.getTix() == null ? "," : price.getTix();
+                csvWriter.append(row + System.lineSeparator());
+            }
+        }
+        pb.close();
+        logger.info("writting file");
+        csvWriter.flush();
+        csvWriter.close();
+        return stringBuffer.toString();
+    }
+
     @GetMapping(path = "/history/{cardId}")
     public @ResponseBody
     Map<String, Object> history(
@@ -94,87 +124,6 @@ public class PriceController {
         }
 
         return ans;
-    }
-
-    @GetMapping(path = "/topten/{format}")
-    public @ResponseBody
-    List<Change> topTenStandard(
-            @PathVariable("format")
-                    String format) {
-        String ans = "";
-        NumberFormat formatter = NumberFormat.getCurrencyInstance();
-        Date today = new java.sql.Date(Calendar.getInstance().getTime().getTime());
-        Date yesterday = subtractDays(today, 1);
-        Date weekAgo = subtractDays(today, 7);
-        List<Card> cards = getAllCards();
-        logger.info("Starting to filter");
-        List<Card> cardsInFormat = cards.stream()
-                .filter(c -> c.getLegalities() != null && c.getLegalities().get(format) && !c.isPromo())
-                .collect(Collectors.toList());
-        logger.info("All {} cards have been filtered from the list", cardsInFormat.size());
-        ArrayList<Change> changes = new ArrayList<Change>();
-        for (Card card : cardsInFormat) {
-            card.getPrice();
-            Change change = new Change();
-            Map<String, Price> map = card.priceHashMap();
-            if (map.containsKey(today.toString()) && map.containsKey(yesterday.toString()) && map
-                    .containsKey(weekAgo.toString())) {
-                change.setCard(card);
-                change.setToday(map.get(today.toString()));
-                change.setYesterday(map.get(yesterday.toString()));
-                change.setWeekAgo(map.get(weekAgo.toString()));
-                changes.add(change);
-            }
-        }
-        List<Change> temp = changes.stream()
-                .filter(c -> c.getToday().getUsd() != null && c.getWeekAgo().getUsd() != null)
-                .sorted(Comparator.comparingDouble(Change::getDailyChange).reversed()).collect(Collectors.toList());
-        return temp.subList(0, 10);
-    }
-
-    @GetMapping(path = "/count")
-    public @ResponseBody
-    long count() {
-        return priceRepository.count();
-    }
-
-    @GetMapping(path = "/history")
-    public @ResponseBody
-    Map<String, Object> history() {
-        List<Card> cards = getAllCards();
-        HashMap<String, Object> ans = new HashMap<>();
-        HashMap<String, Object> finalAns = new HashMap<>();
-        Collection<Price> prices;
-        logger.info("Starting to loop through all the cards");
-        for (Card card : cards) {
-            if (finalAns.size() % 1000 == 0) {
-                logger.info("We have looped through {} cards so far", finalAns.size());
-            }
-            ans.put("card", card.getName());
-            HashMap<String, Object> history = new HashMap<>();
-            prices = card.getPrice();
-            for (Price price : prices) {
-                HashMap<String, String> pricesMap = new HashMap<>();
-                if (price.getUsd() >= 0) {
-                    pricesMap.put("usd", price.getUsd().toString());
-                }
-                if (price.getUsd_foil() >= 0) {
-                    pricesMap.put("usd_foil", price.getUsd_foil().toString());
-                }
-                if (price.getTix() >= 0) {
-                    pricesMap.put("tix", price.getTix().toString());
-                }
-                if (price.getEur() >= 0) {
-                    pricesMap.put("eur", price.getEur().toString());
-                }
-                history.put(price.getDate().toString(), pricesMap);
-            }
-            ans.put("history", history);
-            finalAns.put(card.getId(), ans);
-        }
-        logger.info("All cards have been looped through");
-
-        return finalAns;
     }
 
     @PostMapping(path = "/extrapolateMissingData")
@@ -243,24 +192,6 @@ public class PriceController {
         return "done";
     }
 
-    @GetMapping(path = "/change/set/{set}")
-    public @ResponseBody
-    List<HashMap<String, String>> getsetChange(@PathVariable("set")
-                                                       String set) {
-        List<HashMap<String, String>> maps = new ArrayList<HashMap<String, String>>();
-        List<Card> cards = cardRepository.findAllBySet(set);
-        for (Card card : cards) {
-            try {
-                maps.add(getCardChange(card.getId()));
-            } catch (Exception e) {
-                logger.error("Had an error with card {}. Id of {}", card.getName(), card.getId());
-            }
-        }
-        maps = maps.stream().filter(c -> c.containsKey("daily")).sorted((a, b) -> a.get("daily").compareTo(b.get("daily")))
-                .collect(Collectors.toList());
-        return maps;
-    }
-
     @GetMapping(path = "/change/card/{cardId}")
     public @ResponseBody
     HashMap<String, String> getCardChange(@PathVariable("cardId")
@@ -293,6 +224,44 @@ public class PriceController {
         }
 
         return map;
+    }
+
+    @GetMapping(path = "/old")
+    public @ResponseBody String getOldDate()
+    {
+        String good = "https://archive.scryfall.com/bulk-data/default-cards/default-cards-20200602050438.json";
+        String bad ="https://archive.scryfall.com/bulk-data/default-cards/default-cards-20200602050437.json";
+        String goodResult = jsonHelper.getRequest(good);
+        String badResult = jsonHelper.getRequest(bad);
+        String goodFile = "/Users/mradas341/IdeaProjects/magicPrice/src/main/resources/tmp/good.json";
+        String badFile = "/Users/mradas341/IdeaProjects/magicPrice/src/main/resources/tmp/bad.json";
+
+        try {
+            URL website = new URL(goodResult);
+            try (InputStream in = website.openStream()) {
+                logger.info("Starting to download data from {}.", good);
+                Files.copy(in, Paths.get(goodFile), StandardCopyOption.REPLACE_EXISTING);
+                logger.info("Data finished downloading.");
+            }
+            logger.info("Passed good");
+        }catch(Exception e)
+        {
+            logger.error("Failed good with error {}", e);
+        }
+
+        try {
+            URL website = new URL(badResult);
+            try (InputStream in = website.openStream()) {
+                logger.info("Starting to download data from {}.", bad);
+                Files.copy(in, Paths.get(badFile), StandardCopyOption.REPLACE_EXISTING);
+                logger.info("Data finished downloading.");
+            }
+            logger.info("Passed bad");
+        }catch(Exception e)
+        {
+            logger.error("Failed bad with error {}", e);
+        }
+        return "done";
     }
 
     @PostMapping(path = "/today")
@@ -354,9 +323,9 @@ public class PriceController {
                         //only save a price if its not all null
                         priceArrayList.add(price);
                         if (priceArrayList.size() == 500) {
-                        pb.setExtraMessage("Starting to save data");
+                            pb.setExtraMessage("Starting to save data");
                             priceRepository.saveAll(priceArrayList);
-                        pb.setExtraMessage("Updating all card prices");
+                            pb.setExtraMessage("Updating all card prices");
                             priceArrayList.clear();
                         }
                     }
@@ -367,6 +336,12 @@ public class PriceController {
         }
         logger.info("Done price update");
         return "done";
+    }
+    @DeleteMapping(path = "/{priceId}")
+    public @ResponseBody
+    void deleteByid(@PathVariable("priceId") Long priceId)
+    {
+        priceRepository.deleteById(priceId);
     }
 
 

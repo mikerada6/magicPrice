@@ -19,6 +19,9 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Component
 public class ScryfallHelper {
@@ -35,6 +38,7 @@ public class ScryfallHelper {
         JSONParser parser = new JSONParser();
         Object obj = parser.parse(result);
         JSONObject object = (JSONObject)obj;
+        String updateTime ="";
         if(object.containsKey("data"))
         {
             JSONArray data = (JSONArray) object.get("data");
@@ -45,13 +49,20 @@ public class ScryfallHelper {
                 if(datum.get("name").equals("Default Cards"))
                 {
                     defaultCardsLocation = (String) datum.get("download_uri");
+                    updateTime = (String) datum.get("updated_at");
+                    DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyyLLdd'_'kkmm");
+                    ZonedDateTime zonedDateTime = ZonedDateTime.parse(updateTime);
+//                    LocalDateTime localDateTime = LocalDateTime.parse(updateTime);
+                    updateTime=zonedDateTime.format(format);
                     break;
+
                 }
             }
             int stop = 0;
         }
 
-        String file = "/Users/mradas341/IdeaProjects/magicPrice/src/main/resources/tmp/daily.json";
+        String file = "/Users/mradas341/IdeaProjects/magicPrice/src/main/resources/tmp/"+updateTime+".json";
+//        file = "/../../resources/tmp/"+updateTime+".json";
 
         URL website = new URL(defaultCardsLocation);
         try (InputStream in = website.openStream()) {

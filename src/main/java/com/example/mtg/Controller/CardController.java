@@ -1,199 +1,179 @@
 package com.example.mtg.Controller;
 
-import com.example.mtg.Helper.Dummy;
 import com.example.mtg.Helper.JSONHelper;
+import com.example.mtg.Helper.ScryfallHelper;
 import com.example.mtg.Magic.Card;
+import com.example.mtg.Magic.Format;
 import com.example.mtg.Repository.CardRepository;
+import com.example.mtg.Repository.FormatRepository;
 import com.example.mtg.ResourceNotFoundException;
 import me.tongfei.progressbar.ProgressBar;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
+import java.sql.Date;
+import java.util.*;
 
-@Controller @RequestMapping(path = "/cards") public class CardController {
+import static java.util.stream.Collectors.groupingBy;
 
-	private static final Logger logger = LoggerFactory.getLogger(CardController.class);
+@Controller
+@RequestMapping(path = "/cards")
+public class CardController {
 
-	@Autowired
-	private CardRepository cardRepository;
+    private static final Logger logger = LoggerFactory.getLogger(CardController.class);
+    private static final String[] fieldsToBeUsed = {"name", "id", "type_line", "lang", "rarity", "collector_number",
+            "cmc", "released_at", "promo", "variation", "set_name", "mana_cost", "uri", "oracle_text", "set"};
+    @Autowired
+    private CardRepository cardRepository;
+    @Autowired
+    private FormatRepository formatRepository;
+    @Autowired
+    private JSONHelper jsonHelper;
+    @Autowired
+    private ScryfallHelper scryfallHelper;
 
-	@Autowired
-	private JSONHelper jsonHelper;
+    @GetMapping(path = "/{cardId}")
+    public @ResponseBody
+    Card getCard(
+            @PathVariable("cardId")
+                    String cardId) {
+        return cardRepository.findById(cardId).orElseThrow(() -> new ResourceNotFoundException());
+    }
 
-	private static final String[] fieldsToBeUsed = { "name", "id", "type_line", "lang", "rarity", "collector_number",
-			"cmc", "released_at", "promo", "variation", "set_name", "mana_cost", "uri", "oracle_text", "set" };
+    @DeleteMapping(path = "/{cardId}")
+    public @ResponseBody
+    void deleteCard(
+            @PathVariable("cardId")
+                    String cardId) {
+        cardRepository.deleteById(cardId);
+        return;
+    }
 
-	@GetMapping(path = "/{cardId}")
-	public @ResponseBody
-	Card getCard(
-			@PathVariable("cardId")
-					String cardId) {
-		return cardRepository.findById(cardId).orElseThrow(() -> new ResourceNotFoundException());
-	}
-
-	@DeleteMapping(path = "/{cardId}")
-	public @ResponseBody
-	void deleteCard(
-			@PathVariable("cardId")
-					String cardId) {
-		cardRepository.deleteById(cardId);
-		return;
-	}
-	@PostMapping(path = "/{cardId}")
-	public @ResponseBody
-	Card addCard(
-			@PathVariable("cardId")
-					String cardId) {
-		String url = "https://api.scryfall.com/cards/"+cardId;
-		Card c = new Card();
-		String result = jsonHelper.getRequest(url);
-		return c;
-	}
+    @PostMapping(path = "/{cardId}")
+    public @ResponseBody
+    Card addCard(
+            @PathVariable("cardId")
+                    String cardId) {
+        String url = "https://api.scryfall.com/cards/" + cardId;
+        Card c = new Card();
+        String result = jsonHelper.getRequest(url);
+        return c;
+    }
 
 
+    @GetMapping(path = "")
+    public @ResponseBody
+    List<Card> getAllCards() {
+        logger.info("Starting to fetch all the cards");
+        List<Card> cards = cardRepository.findAll();
+        logger.info("All {} have been retrieved from the database", cards.size());
+        return cards;
+    }
 
-	@GetMapping(path = "")
-	public @ResponseBody
-	List<Card> getAllCards() {
-		logger.info("Starting to fetch all the cards");
-		List<Card> cards = cardRepository.findAll();
-		logger.info("All {} have been retrieved from the database", cards.size());
-		return cards;
-	}
+    @PostMapping(path = "")
+    public @ResponseBody
+    Card addCard(Card c) {
+        return cardRepository.save(c);
+    }
 
-	@PostMapping(path = "")
-	public @ResponseBody
-	Card addCard(Card c) {
-		return cardRepository.save(c);
-	}
+    @PostMapping(path = "/today")
+    public @ResponseBody
+    ArrayList<Card> update() {
+        ArrayList<Card> cards = new ArrayList<Card>();
+        JSONArray arrayData = null;
+        try {
+            arrayData = scryfallHelper.downloadDailyBulkData();
+        } catch (ParseException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if (arrayData != null) {
+            ProgressBar pb = new ProgressBar("Updating all card prices", arrayData.size());
+            for (Object arrayDatum : arrayData) {
+                pb.step();
+                JSONObject datum = ((JSONObject) arrayDatum);
+                if (datum.get("lang").equals("en")) {
+                    Card card = new Card();
+                    card.setId((String) datum.get("id"));
+                    card.setName((String) datum.get("name"));
+                    card.setSet((String) datum.get("set"));
+                    card.setSet_name((String) datum.get("set_name"));
+                    card.setURI((String) datum.get("uri"));
+                    card.setManaCost((String) datum.get("mana_cost"));
+//                  card.setOracleText((String) datum.get("oracle_text"));
+                    card.setRarity((String) datum.get("rarity"));
+                    card.setCmc((Double) datum.get("cmc"));
+                    card.setCollector_number((String) datum.get("collector_number"));
+                    String released_at = (String) datum.get("released_at");
+                    card.setReleased_at(Date.valueOf(released_at));
+                    card.setTypeLine((String) datum.get("type_line"));
+                    if (datum.containsKey("colors")) {
+                        JSONArray JSONcolors = (JSONArray) datum.get("colors");
+                        String colors = "";
+                        for (Object tempColor : JSONcolors) {
+                            colors += (String) tempColor;
+                        }
+                        card.setColor(colors);
+                    }
 
-	@PostMapping(path = "/today/bulk")
-	public @ResponseBody
-	String bulkUpdate() {
-		String file = "/Users/mradas341/IdeaProjects/magicPrice/src/main/resources/tmp/default-cards-20200525060433"
-				+ ".json";
-		JSONArray array = Dummy.readFromFile(file);
-		ProgressBar pb = new ProgressBar("Updating all cards", array.size());
-		for (Object item : array) {
-			JSONObject o = (JSONObject) item;
-			Card c = new Card();
-			o.get("name");
-			int stop = 0;
-		}
-		return "done";
-	}
+                    JSONObject formats = ((JSONObject) datum.get("legalities"));
+                    Set<String> keys = formats.keySet();
+                    for(String key: keys)
+                    {
+                        if(formats.get(key).equals("legal")) {
+                            Optional<Format> formatOptional = formatRepository.findByName(key);
+                            if (!formatOptional.isPresent()) {
+                                Format newFormat = new Format();
+                                newFormat.setName(key);
+                                formatOptional = Optional.of(formatRepository.save(newFormat));
+                            }
+                            Format format = formatOptional.get();
+                            format.addCard(card);
+                            card.addFormat(format);
+                        }
+                    }
 
-	@GetMapping(path = "/progress")
-	public @ResponseBody
-	String progressTest() {
-		ProgressBar pb = new ProgressBar("Downloading the internet", 2000);
-		return"done";
-	}
+                    cards.add(card);
+                }
+                if (cards.size() == 500) {
+                    cardRepository.saveAll(cards);
+                    cards.clear();
+                }
+            }
+            cardRepository.saveAll(cards);
+            logger.info("Ending saving");
+            cards.clear();
+            pb.close();
+        }
+        return cards;
 
-//		@PostMapping(path = "/today")
-//		public @ResponseBody
-//		ArrayList<Card> update() {
-//			ArrayList<Card> cards = new ArrayList<Card>();
-//			String url = "https://api.scryfall.com/cards";
-//			logger.info("Starting update");
-//			long lastScryFallCall = 0L;
-//
-//			boolean cont = true;
-//
-//			while (cont) {
-//				long timeSpent = System.currentTimeMillis() - lastScryFallCall;
-//				if (timeSpent < 50) {
-//					try {
-//						logger.info("sleeping for {}", 50 - timeSpent);
-//						Thread.sleep(50 - timeSpent);
-//					} catch (InterruptedException e) {
-//						e.printStackTrace();
-//					}
-//				} else {
-//					logger.info("did not sleep");
-//				}
-//				String result = "";
-//				lastScryFallCall = System.currentTimeMillis();
-//				if (!StringUtils.isEmpty(result)) {
-//					result = jsonHelper.getRequest(url);
-//					org.json.JSONObject jsonObject = JSONHelper.getJsonObject(result);
-//					cont = jsonObject.has("has_more") && jsonObject.getBoolean("has_more");
-//					url = jsonObject.has("next_page") && cont ? jsonObject.getString("next_page") : null;
-//					JSONArray data = jsonObject.has("data") ? jsonObject.getJSONArray("data") : null;
-//
-//					int stop = 0;
-//
-//					for (int i = 0; i < data.length(); i++) {
-//						JSONObject datum = data.getJSONObject(i);
-//						Card card = new Card();
-//						try {
-//							String language = datum.has("lang") ? datum.getString("lang") : "";
-//							if (language.equalsIgnoreCase("en")) {
-//
-//								//we are only going to save cards if they are in english.
-//								for (String field : fieldsToBeUsed) {
-//									if (datum.has(field)) {
-//										String fieldValue = datum.get(field).toString();
-//										logger.trace("Setting field {} with a value of {}", field, fieldValue);
-//										card.setValueString(field, fieldValue);
-//									} else {
-//										logger.warn("Could not find the value of {} for card {}", field, datum);
-//									}
-//								}
-//								JSONArray colors = datum.has("color_identity") ?
-//										datum.getJSONArray("color_identity") :
-//										null;
-//								HashMap<String, Boolean> legality = getFormatLegaltiy(datum);
-//								card.setColorFromScryFall(colors);
-//								card.setLegalities(legality);
-//
-//								cards.add(card);
-//
-//								if (cards.size() == 500) {
-//									logger.info("Starting saving of {} cards.", cards.size());
-//									cardRepository.saveAll(cards);
-//
-//									logger.info("Ending saving");
-//									cards.clear();
-//								}
-//							}
-//						} catch (Exception e) {
-//							logger.error("Ran into error {} .  With card {} CARD:", e, datum.get("id"));
-//						}
-//					}
-//				}
-//
-//			}
-//			logger.info("Starting final saving of {} cards.", cards.size());
-//			cardRepository.saveAll(cards);
-//
-//			logger.info("Ending saving");
-//			cards.clear();
-//			return cards;
-//		}
+    }
+    @PostMapping(path = "/empty")
+    public @ResponseBody
+    String empty()
+    {
+        int stop =0;
+        Map<String, List<Card>> map = formatRepository.findByName("standard").get().getCards().stream().collect(groupingBy(Card::getSet));
+        return "done";
+    }
 
-	//	private HashMap<String, Boolean> getFormatLegaltiy(JSONObject element) {
-	//		HashMap<String, Boolean> ans = new HashMap<String, Boolean>();
-	//		Iterator<String> keys = element.getJSONObject("legalities").keys();
-	//		for (Iterator<String> it = keys; it.hasNext(); ) {
-	//			String key = it.next();
-	//			boolean legal = !element.getJSONObject("legalities").get(key).toString().equals("not_legal");
-	//			ans.put(key, legal);
-	//		}
-	//		return ans;
-	//	}
+
+    @PostMapping(path = "/format/{name}")
+    public @ResponseBody
+    Format createFormat(@PathVariable("name")
+                                         String name)
+    {
+        Format newFormat = new Format();
+        newFormat.setName(name);
+        return formatRepository.save(newFormat);
+    }
 
 }
