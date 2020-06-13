@@ -25,7 +25,7 @@ import java.io.IOException;
 	}
 
 	public String getRequest(String url) {
-		logger.info("Getting info from {}.", url);
+//		logger.info("Getting info from {}.", url);
 		String result = null;
 
 		HttpGet request = new HttpGet(url);

@@ -31,7 +31,7 @@ public class ScryfallHelper {
     private JSONHelper jsonHelper;
 
     public JSONArray downloadDailyBulkData() throws ParseException, IOException {
-        String url = "https://api.scryfall.com/bulk-data";
+        String url = "https://api.scryfallk.com/bulk-data";
         String defaultCardsLocation = null;
 
         String result = jsonHelper.getRequest(url);

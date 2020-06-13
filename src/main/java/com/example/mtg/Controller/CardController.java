@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.sql.Date;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.groupingBy;
 
@@ -40,11 +41,43 @@ public class CardController {
     private ScryfallHelper scryfallHelper;
 
     @GetMapping(path = "/{cardId}")
+    @CrossOrigin(origins = "http://localhost:4200")
     public @ResponseBody
     Card getCard(
             @PathVariable("cardId")
                     String cardId) {
+        logger.info("got a request for card id: {}.", cardId);
         return cardRepository.findById(cardId).orElseThrow(() -> new ResourceNotFoundException());
+    }
+
+    @GetMapping(path = "/sets")
+    @CrossOrigin(origins = "http://localhost:4200")
+    public @ResponseBody
+    List<String> getCardsFromSet() {
+        logger.info("got a request for all sets");
+
+        return cardRepository.findAllSets().stream().sorted().collect(Collectors.toList());
+    }
+
+    @GetMapping(path = "/set/{setName}")
+    @CrossOrigin(origins = "http://localhost:4200")
+    public @ResponseBody
+    List<Card> getSets(
+            @PathVariable("setName")
+                    String setName) {
+        logger.info("got a request for cards from set {}.", setName);
+
+        return cardRepository.findAllBySet(setName).stream().sorted(Card::compareTo).collect(Collectors.toList());
+    }
+
+
+    @GetMapping(path = "count/{num}")
+    public @ResponseBody
+    ArrayList<Card> getCard(
+            @PathVariable("num")
+                    int num) {
+        List<Card> cards = cardRepository.findAll();
+        return (ArrayList<Card>) cards.stream().filter(c -> cards.indexOf(c)<=num).collect(Collectors.toList());
     }
 
     @DeleteMapping(path = "/{cardId}")
@@ -57,14 +90,16 @@ public class CardController {
     }
 
     @PostMapping(path = "/{cardId}")
+    @CrossOrigin(origins = "http://localhost:4200")
     public @ResponseBody
     Card addCard(
             @PathVariable("cardId")
                     String cardId) {
         String url = "https://api.scryfall.com/cards/" + cardId;
         Card c = new Card();
-        String result = jsonHelper.getRequest(url);
-        return c;
+        return cardRepository.findById(cardId).orElseThrow(() -> new ResourceNotFoundException("No such card "
+                                                                                                       + "with id " + cardId));
+
     }
 
 

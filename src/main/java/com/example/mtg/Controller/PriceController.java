@@ -91,42 +91,7 @@ public class PriceController {
         return stringBuffer.toString();
     }
 
-    @GetMapping(path = "/history/{cardId}")
-    public @ResponseBody
-    Map<String, Object> history(
-            @PathVariable("cardId")
-                    String cardId) {
-        Set<Card> cards = cardRepository.findAllById(cardId);
-        HashMap<String, Object> ans = new HashMap<>();
-        Collection<Price> prices;
-        for (Card card : cards) {
-            ans.put("cardId", card.getId());
-            ans.put("card", card.getName());
-            HashMap<String, Object> history = new HashMap<>();
-            prices = card.getPrice();
-            for (Price price : prices) {
-                HashMap<String, String> pricesMap = new HashMap<>();
-                if (price.getUsd() >= 0) {
-                    pricesMap.put("usd", price.getUsd().toString());
-                }
-                if (price.getUsd_foil() >= 0) {
-                    pricesMap.put("usd_foil", price.getUsd_foil().toString());
-                }
-                if (price.getTix() >= 0) {
-                    pricesMap.put("tix", price.getTix().toString());
-                }
-                if (price.getEur() >= 0) {
-                    pricesMap.put("eur", price.getEur().toString());
-                }
-                history.put(price.getDate().toString(), pricesMap);
-            }
-            ans.put("history", history);
-        }
-
-        return ans;
-    }
-
-    @PostMapping(path = "/extrapolateMissingData")
+        @PostMapping(path = "/extrapolateMissingData")
     public @ResponseBody
     String extrapolateMissingData(String startDate, String endDate) {
         List<Price> prices = getAll();

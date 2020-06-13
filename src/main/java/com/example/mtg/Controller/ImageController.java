@@ -2,6 +2,7 @@ package com.example.mtg.Controller;
 
 import com.example.mtg.Helper.JSONHelper;
 import com.example.mtg.Magic.Card;
+import com.example.mtg.Magic.Color;
 import com.example.mtg.Repository.CardRepository;
 import com.example.mtg.ResourceNotFoundException;
 import me.tongfei.progressbar.ProgressBar;
@@ -21,7 +22,12 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.groupingBy;
 
 @Controller
 @RequestMapping(path = "/images")
@@ -79,7 +85,6 @@ public class ImageController {
 
 
 
-
         File file = new File(directory);
         List<File> fileList = Arrays.asList(file.listFiles());
         List<Card> cards = cardRepository.findAll();
@@ -127,9 +132,70 @@ public class ImageController {
     byte[] getSet(
             ArrayList<String> sets) {
         for (String set : sets) {
-            logger.info("Getting images for set {}.", set);
+            logger.info("Getting images for set {}.",
+                        set);
             getSet(set);
         }
+        return null;
+    }
+
+
+    @GetMapping(path = "/color")
+    public @ResponseBody
+    byte[] getColor() {
+        Map<Color, List<Card>> cardMapColor = cardRepository.findAll().stream().filter(c -> c.getColor() != null && c.getURI() != null).collect(groupingBy(Card::getColor));
+        String PATH = "./src/main/resources/img/colors/";
+        Set<String> folders = cardMapColor.keySet().stream().map(s -> s.toString()).collect(Collectors.toSet());
+        folders.add("LAND");
+        folders.add("TOKEN");
+        for (String add : folders) {
+            String directoryName = PATH.concat(add);
+            File directory = new File(directoryName);
+            if (!directory.exists()) {
+                directory.mkdirs();
+            }
+        }
+        for (Color color : cardMapColor.keySet()) {
+            if(color.equals(Color.GOLD) || color.equals(Color.COLORLESS))
+            {
+                continue;
+            }
+            String folder = color.toString();
+            String directoryName = PATH.concat(folder);
+
+            ProgressBar pb = new ProgressBar(color.toString(),
+                                             cardMapColor.get(color).size());
+            for (Card card : cardMapColor.get(color)) {
+                directoryName = PATH.concat(folder);
+                if (card.getTypeLine().contains("Vanguard") || (card.getTypeLine().contains("Plane")))
+                {
+                    continue;
+                }
+                else if (card.getTypeLine().contains("Token") || card.getTypeLine().contains("Emblem")) {
+                    directoryName = PATH.concat("TOKEN");
+                }
+                else if (card.getTypeLine().contains("Land")) {
+                    directoryName = PATH.concat("LAND");
+                }
+                pb.step();
+                JSONObject json = JSONHelper.getJsonObject(jsonHelper.getRequest(card.getURI()));
+                Image image = null;
+                if (json.has("image_uris")) {
+                    JSONObject map = (JSONObject) json.get("image_uris");
+                    String urlString = (String) map.get("large");
+
+                    try {
+                        byte[] response = getImageFromURL(urlString);
+                        saveImageToFile(directoryName,
+                                        card.getId(),
+                                        response);
+                    } catch (IOException e) {
+                    }
+                }
+            }
+            pb.close();
+        }
+
         return null;
     }
 
@@ -140,14 +206,7 @@ public class ImageController {
      * @throws IOException
      */
     private void saveImageToFile(String folder, String file, byte[] image) throws IOException {
-        Random rand = new Random();
-        String temp = "magicPriceborrowed_image.jpg";
         String PATH = "";
-//        if (rand.nextDouble() <= .80) {
-//            PATH = "//Users//mradas341//IdeaProjects//pics//Training//";
-//        } else {
-//            PATH = "//Users//mradas341//IdeaProjects//pics//Validation//";
-//        }
         String directoryName = PATH.concat(folder);
         String fileName = file + ".jpg";
 

@@ -1,7 +1,6 @@
 package com.example.mtg.Magic;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.json.JSONArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +46,7 @@ public class Card implements Comparable<Card> {
     @JoinTable(name = "card_formats",
             joinColumns = { @JoinColumn(name = "card_id") },
             inverseJoinColumns = { @JoinColumn(name = "format_id") })
+    @JsonIgnore
     List<Format> formats;
 
     @JsonIgnore
@@ -134,8 +134,20 @@ public class Card implements Comparable<Card> {
 
     @Override
     public int compareTo(Card o) {
-        //TODO finish
-        return 0;
+        int thisNum = this.convertCollectorNumber();
+        int oNum = o.convertCollectorNumber();
+        if(thisNum==oNum)
+        {
+            return 0;
+        }
+        else if(thisNum>oNum)
+        {
+            return 1;
+        }
+        else
+        {
+            return -1;
+        }
     }
 
     private HashMap<String, Object> createMapping(String methodName, Object dataType) {

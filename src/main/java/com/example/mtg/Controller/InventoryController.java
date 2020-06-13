@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -58,25 +59,29 @@ import static java.util.stream.Collectors.groupingBy;
 	@Autowired
 	private com.example.mtg.Repository.CardPurchaseAssociationRepository cardPurchaseAssociationRepository;
 
-	@GetMapping(path = "/vednors")
+	@GetMapping(path = "/vendors")
+	@CrossOrigin(origins = "http://localhost:4200")
 	public @ResponseBody
-	List<Vendor> vednors() {
+	List<Vendor> vendors() {
 		return vendorRepository.findAll();
 	}
 
-	@PostMapping(path = "/vednors")
+	@PostMapping(path = "/vendors")
+	@CrossOrigin(origins = "http://localhost:4200")
 	public @ResponseBody
-	Vendor vednors(Vendor v) {
+	Vendor vendors(Vendor v) {
 		return vendorRepository.save(v);
 	}
 
 	@GetMapping(path = "/transaction")
+	@CrossOrigin(origins = "http://localhost:4200")
 	public @ResponseBody
 	List<Transaction> purchases() {
 		return transactionRepository.findAll();
 	}
 
 	@PostMapping(path = "/transaction")
+	@CrossOrigin(origins = "http://localhost:4200")
 	public @ResponseBody
 	Transaction transaction(TransactionHelper th) {
 		Transaction t = new Transaction();
@@ -88,6 +93,7 @@ import static java.util.stream.Collectors.groupingBy;
 	}
 
 	@PostMapping(path = "/transaction/{transID}/card/{cardId}/foil/{isFoil}")
+	@CrossOrigin(origins = "http://localhost:4200")
 	public @ResponseBody
 	void transaction(@PathVariable("transID") long transID,@PathVariable("cardId") String cardId,@PathVariable(
 			"isFoil") boolean isFoil ) {
@@ -96,6 +102,7 @@ import static java.util.stream.Collectors.groupingBy;
 	}
 
 	@GetMapping(path = "/transaction/set/{setName}/")
+	@CrossOrigin(origins = "http://localhost:4200")
 	public @ResponseBody
 	void setCount(@PathVariable("setName") String setName) {
 		Set<Card> cards =
@@ -139,33 +146,43 @@ import static java.util.stream.Collectors.groupingBy;
 		{
 			System.out.print(tempDate.toString()+"\t");
 		}
-		System.out.println();
-		for(CardPurchaseAssociation cpa: associations)
-		{
-			Card card = cpa.getCard();
-			Transaction transaction = cpa.getTransaction();
-			System.out.print(card.getId()+"\t"+card.getName()+"\t" + cpa.isFoil() +"\t");
-			for(Date tempDate: dates)
-			{
-				try {
-					Price price = priceRepository.findByDateAndAndCard(tempDate, cpa.getCard()).orElse(null);
-					Double priceToAdd = cpa.isFoil() ? price.getUsd_foil() : price.getUsd();
-					System.out.print(priceToAdd + "\t");
-				}catch(Exception e)
-				{
-					System.out.print("\t");
-				}
-			}
-			System.out.println();
-		}
+//		System.out.println();
+//		for(CardPurchaseAssociation cpa: associations)
+//		{
+//			Card card = cpa.getCard();
+//			Transaction transaction = cpa.getTransaction();
+//			System.out.print(card.getId()+"\t"+card.getName()+"\t" + cpa.isFoil() +"\t");
+//			for(Date tempDate: dates)
+//			{
+//				try {
+//					Price price = priceRepository.findByDateAndAndCard(tempDate, cpa.getCard()).orElse(null);
+//					Double priceToAdd = cpa.isFoil() ? price.getUsd_foil() : price.getUsd();
+//					System.out.print(priceToAdd + "\t");
+//				}catch(Exception e)
+//				{
+//					System.out.print("\t");
+//				}
+//			}
+//			System.out.println();
+//		}
 		date = min.getDate();
 		while(date.before(today))
 		{
 			sum =0;
 			for(CardPurchaseAssociation cpa: associations)
 			{
-				Price price =
-						priceRepository.findByDateAndAndCard(date, cpa.getCard()).orElse(null);
+				Price price = null;
+				try {
+					price =
+							priceRepository.findByDateAndAndCard(date,
+																 cpa.getCard()).orElse(null);
+				}
+				catch(Exception e)
+				{
+					Date errorDate = date;
+					Card errorCard = cpa.getCard();
+					int stop=0;
+				}
 				if(price!=null)
 				{
 					Double priceToAdd = cpa.isFoil() ? price.getUsd_foil() : price.getUsd();
@@ -178,7 +195,6 @@ import static java.util.stream.Collectors.groupingBy;
 
 		}
 
-		int stop=0;
 	}
 
 	@PostMapping(path = "/transaction/addCards")
