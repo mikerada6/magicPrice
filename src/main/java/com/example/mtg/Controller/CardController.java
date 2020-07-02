@@ -118,6 +118,12 @@ public class CardController {
         return cardRepository.save(c);
     }
 
+    @GetMapping(path = "/bruteForce")
+    public @ResponseBody
+    void bruteForce() {
+        scryfallHelper.bruteForce();
+    }
+
     @PostMapping(path = "/today")
     public @ResponseBody
     ArrayList<Card> update() {
