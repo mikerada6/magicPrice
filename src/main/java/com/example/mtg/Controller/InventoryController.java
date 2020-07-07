@@ -2,6 +2,8 @@ package com.example.mtg.Controller;
 
 import com.example.mtg.Helper.Helper;
 import com.example.mtg.Helper.JSONHelper;
+import com.example.mtg.Helper.PriceHelper;
+import com.example.mtg.Helper.TransactionDetailsRequestModel;
 import com.example.mtg.Helper.TransactionHelper;
 import com.example.mtg.Magic.Card;
 import com.example.mtg.Magic.CardPurchaseAssociation;
@@ -32,6 +34,7 @@ import java.sql.Date;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -48,6 +51,8 @@ import static java.util.stream.Collectors.groupingBy;
 public class InventoryController {
 
     private static final Logger logger = LoggerFactory.getLogger(InventoryController.class);
+    private final NumberFormat currency = NumberFormat.getCurrencyInstance();
+    private final NumberFormat percent = NumberFormat.getPercentInstance();
     @Autowired
     Environment env;
     @Autowired
@@ -60,6 +65,8 @@ public class InventoryController {
     private TransactionRepository transactionRepository;
     @Autowired
     private JSONHelper jsonHelper;
+    @Autowired
+    private TransactionHelper transactionHelper;
     @Autowired
     private com.example.mtg.Repository.CardPurchaseAssociationRepository cardPurchaseAssociationRepository;
 
@@ -84,25 +91,42 @@ public class InventoryController {
         return transactionRepository.findAll();
     }
 
-    @PostMapping(path = "/transaction")
-    @CrossOrigin(origins = "http://localhost:4200")
-    public @ResponseBody
-    Transaction transaction(TransactionHelper th) {
-        Transaction t = new Transaction();
-        t.setCost(th.getCost());
-        t.setDate(th.getDate());
-        t.setDescription(th.getDescription());
-        t.setVendor(vendorRepository.findById(th.getVednorId()).orElseGet(null));
-        return transactionRepository.save(t);
-    }
-
     @PostMapping(path = "/transaction/{transID}/card/{cardId}/foil/{isFoil}")
     @CrossOrigin(origins = "http://localhost:4200")
     public @ResponseBody
-    void transaction(@PathVariable("transID") long transID, @PathVariable("cardId") String cardId, @PathVariable(
+    CardPurchaseAssociation transaction(@PathVariable("transID") long transID, @PathVariable("cardId") String cardId, @PathVariable(
             "isFoil") boolean isFoil) {
         Transaction t = new Transaction();
-        transactionRepository.save(t);
+        Card card = cardRepository
+                .findById(cardId)
+                .orElseThrow(() -> new ResourceNotFoundException("could not find card"));
+        Transaction transaction = transactionRepository
+                .findById(transID)
+                .orElseThrow(() -> new ResourceNotFoundException("could not find transaction"));
+        CardPurchaseAssociation cardPurchaseAssociation = new CardPurchaseAssociation();
+        cardPurchaseAssociation.setFoil(isFoil);
+        cardPurchaseAssociation.setTransaction(transaction);
+        cardPurchaseAssociation.setCard(card);
+        return cardPurchaseAssociationRepository.save(cardPurchaseAssociation);
+
+    }
+
+    @GetMapping(path = "/transaction/dailyValue/{transID}")
+    @CrossOrigin(origins = "http://localhost:4200")
+    public @ResponseBody
+    void dailyValue(@PathVariable("transID") long transID) {
+        Transaction transaction = transactionRepository
+                .findById(transID)
+                .orElseThrow(() -> new ResourceNotFoundException());
+        Collection<CardPurchaseAssociation> cpas = transaction.getCardPurchaseAssociation();
+        for (CardPurchaseAssociation cpa : cpas) {
+            System.out.println(cpa.getCardId() +
+                               '\t' +
+                               cpa.getCard().getName() +
+                               "\t" +
+                               getCardsPrice(cpa.getCardId(),
+                                             cpa.isFoil()));
+        }
     }
 
     @GetMapping(path = "/transaction/set/{setName}/")
@@ -126,8 +150,6 @@ public class InventoryController {
 
             System.out.println(card.getName() + "\t" + count);
         }
-        int stop = 0;
-
     }
 
     @GetMapping(path = "/transaction/stock")
@@ -180,6 +202,21 @@ public class InventoryController {
         return ans;
     }
 
+    @PostMapping(path = "/transaction", consumes = "application/json")
+    public @ResponseBody
+    Transaction createNewTransaction(
+            @RequestBody TransactionDetailsRequestModel transactionDetailsRequestModel) {
+        Transaction t = new Transaction();
+        t.setCost(transactionDetailsRequestModel.getCost());
+        t.setDescription(transactionDetailsRequestModel.getDescription());
+        Vendor vendor = vendorRepository
+                .findById(transactionDetailsRequestModel.getVendorId())
+                .orElseThrow(() -> new ResourceNotFoundException("could not find vendor"));
+        t.setVendor(vendor);
+        t.setDate(transactionDetailsRequestModel.getDate());
+        return transactionRepository.save(t);
+    }
+
     @PostMapping(path = "/transaction/addCards")
     public @ResponseBody
     void transaction(
@@ -215,242 +252,181 @@ public class InventoryController {
         transactionRepository.deleteById(id);
     }
 
-    @GetMapping(path = "/input/{setName}")
+    @CrossOrigin(origins = "http://localhost:4200")
+    @GetMapping(path = "/collection")
     public @ResponseBody
-    String getInput(@PathVariable("setName") String setName) {
-        List<Card> cards = cardRepository.findAllBySet(setName);
-        cards = cards.stream().sorted(Comparator.comparing(Card::convertCollectorNumber))
-                     .collect(Collectors.toList());
-        String ans = "";
-        for (Card card : cards.stream().filter(c -> c.getRarity().equals(Rarity.COMMON)).collect(Collectors.toList())) {
-            ans += card.getId() +
-                   "\t" +
-                   card.getName() +
-                   "\t" +
-                   card.getCollector_number() +
-                   "\t" +
-                   card.getManaCost() +
-                   "\t" +
-                   card.getRarity() +
-                   "\n";
-        }
-        for (Card card : cards
+    ArrayList<HashMap<String, String>> collection() {
+
+        percent.setMinimumFractionDigits(2);
+        percent.setMaximumFractionDigits(2);
+        ArrayList<HashMap<String, String>> response = new ArrayList<>();
+        List<CardPurchaseAssociation> cards = cardPurchaseAssociationRepository.findAll();
+
+
+        Map<String, List<CardPurchaseAssociation>> normalCards = cards
                 .stream()
-                .filter(c -> c.getRarity().equals(Rarity.UNCOMMON))
-                .collect(Collectors.toList())) {
-            ans += card.getId() +
-                   "\t" +
-                   card.getName() +
-                   "\t" +
-                   card.getCollector_number() +
-                   "\t" +
-                   card.getManaCost() +
-                   "\t" +
-                   card.getRarity() +
-                   "\n";
+                .filter(cpa -> !cpa.isFoil())
+                .collect(groupingBy(CardPurchaseAssociation::getCardId));
+
+        Map<String, List<CardPurchaseAssociation>> foilCards = cards
+                .stream()
+                .filter(cpa -> cpa.isFoil())
+                .collect(groupingBy(CardPurchaseAssociation::getCardId));
+
+        //.collect(groupingBy(CardPurchaseAssociation::getCardId));
+
+
+        for (String key : normalCards.keySet()) {
+            CardPurchaseAssociation cpa = normalCards.get(key).get(0);
+            Card card = cpa.getCard();
+            HashMap<String, String> singleResponse = new HashMap<String, String>();
+            singleResponse.put("cardId",
+                               cpa.getCardId());
+            singleResponse.put("name",
+                               cpa.getCard().getName());
+            singleResponse.put("id",
+                               cpa.getCardId());
+            singleResponse.put("set",
+                               card.getSet());
+            singleResponse.put("rarity",
+                               card.getRarity().toString());
+            singleResponse.put("quantity",
+                               normalCards.get(key).size()+"");
+
+            List<Price> temp = priceRepository.findMostRecentWeekByCard(card.getId());
+            if (temp.size() == 7) {
+                    Price todaysPrice = temp.get(0);
+
+                    Price yesterdayPrice = temp.get(1);
+                    Price weekAgoPrice = temp.get(6);
+                    if(todaysPrice.getUsd() != null) {
+                        double dailyValue = todaysPrice.getUsd();
+                        singleResponse.put("price",
+                                           currency.format(dailyValue));
+                        if(yesterdayPrice.getUsd() !=null)
+                        {
+                            double yesterdayValue = yesterdayPrice.getUsd();
+                            singleResponse.put("dailyDollar",currency.format(dailyValue-yesterdayValue));
+                            singleResponse.put("dailyPercent",percent.format((dailyValue-yesterdayValue)/dailyValue));
+                            if(weekAgoPrice.getUsd() !=null)
+                            {
+                                double weekValue = weekAgoPrice.getUsd();
+                                singleResponse.put("weeklyDollar",currency.format(dailyValue-weekValue));
+                                singleResponse.put("weeklyPercent",percent.format((dailyValue-weekValue)/dailyValue));
+                            }
+
+                        }
+                    }
+            }
+            response.add(singleResponse);
         }
-        for (Card card :
-                cards
-                        .stream()
-                        .filter(c -> c.getRarity().equals(Rarity.RARE) || c.getRarity().equals(Rarity.MYTHIC))
-                        .collect(Collectors.toList())) {
-            ans += card.getId() +
-                   "\t" +
-                   card.getName() +
-                   "\t" +
-                   card.getCollector_number() +
-                   "\t" +
-                   card.getManaCost() +
-                   "\t" +
-                   card.getRarity() +
-                   "\n";
+
+        for (String key : foilCards.keySet()) {
+            CardPurchaseAssociation cpa = foilCards.get(key).get(0);
+            Card card = cpa.getCard();
+            HashMap<String, String> singleResponse = new HashMap<String, String>();
+            singleResponse.put("cardId",
+                               cpa.getCardId());
+            singleResponse.put("name",
+                               cpa.getCard().getName()+"(F)");
+            singleResponse.put("id",
+                               cpa.getCardId());
+            singleResponse.put("set",
+                               card.getSet());
+            singleResponse.put("rarity",
+                               card.getRarity().toString());
+            singleResponse.put("quantity",
+                               foilCards.get(key).size()+"");
+
+            List<Price> temp = priceRepository.findMostRecentWeekByCard(card.getId());
+            if (temp.size() == 7) {
+                Price todaysPrice = temp.get(0);
+
+                Price yesterdayPrice = temp.get(1);
+                Price weekAgoPrice = temp.get(6);
+                if(todaysPrice.getUsd_foil() != null) {
+                    double dailyValue = todaysPrice.getUsd_foil();
+                    singleResponse.put("price",
+                                       currency.format(dailyValue));
+                    if(yesterdayPrice.getUsd_foil() !=null)
+                    {
+                        double yesterdayValue = yesterdayPrice.getUsd_foil();
+                        singleResponse.put("dailyDollar",currency.format(dailyValue-yesterdayValue));
+                        singleResponse.put("dailyPercent",percent.format((dailyValue-yesterdayValue)/dailyValue));
+                        if(weekAgoPrice.getUsd_foil() !=null)
+                        {
+                            double weekValue = weekAgoPrice.getUsd_foil();
+                            singleResponse.put("weeklyDollar",currency.format(dailyValue-weekValue));
+                            singleResponse.put("weeklyPercent",percent.format((dailyValue-weekValue)/dailyValue));
+                        }
+
+                    }
+                }
+            }
+            response.add(singleResponse);
         }
-        System.out.println(ans);
-        return ans;
+
+        return response;
     }
 
-    @GetMapping(path = "/mtggoldfish/all")
+    @CrossOrigin(origins = "http://localhost:4200")
+    @GetMapping(path = "/dumyTest")
     public @ResponseBody
-    String mtgGoldfishAll() {
-        String ans = "";
-        Map<String, List<CardPurchaseAssociation>> cpas = cardPurchaseAssociationRepository.findAll().stream()
-                                                                                           .collect(groupingBy(CardPurchaseAssociation::getCardId));
-        Date today = new java.sql.Date(Calendar.getInstance().getTime().getTime());
-        Date yesteday = addDays(today,
-                                -1);
-        Date weekago = addDays(today,
-                               -7);
-        for (String key : cpas.keySet()) {
-            Card card = cpas.get(key).get(0).getCard();
-            long foils = cpas.get(key).stream().filter(c -> c.isFoil()).count();
-            long nonFoils = cpas.get(key).stream().filter(c -> !c.isFoil()).count();
-            Set<Price> prices = priceRepository.findAllByCardId(card.getId());
-            if (foils > 0) {
-                ans += card.getName() + " (F) \t";
-                ans += card.getSet() + "\t";
-                ans += card.getRarity() + "\t";
-                ans += foils + "\t";
-                Price todaysPrice = prices
-                        .stream()
-                        .filter(p -> p.getDate().toString().equals(today.toString()))
-                        .findFirst()
-                        .orElse(null);
-                Price yestedaysPrice = prices
-                        .stream()
-                        .filter(p -> p.getDate().toString().equals(yesteday.toString()))
-                        .findFirst()
-                        .orElse(null);
-                Price weekagoPrice = prices
-                        .stream()
-                        .filter(p -> p.getDate().toString().equals(weekago.toString()))
-                        .findFirst()
-                        .orElse(null);
-                if (todaysPrice != null) {
-                    ans += todaysPrice.getUsd_foil() + "\t";
-				} else {
-                    ans += "\t";
-                }
-                if (todaysPrice != null && yestedaysPrice != null) {
-                    double a = todaysPrice.getUsd_foil();
-                    double b = yestedaysPrice.getUsd_foil();
-                    ans += (a - b) + "\t";
-                    ans += ((a - b) / a) + "\t";
-                } else {
-                    ans += "\t\t";
-                }
-                if (todaysPrice != null && weekagoPrice != null) {
-                    double a = todaysPrice.getUsd_foil();
-                    double b = weekagoPrice.getUsd_foil();
-                    ans += (a - b) + "\t";
-                    ans += ((a - b) / a) + "\t";
-                } else {
-                    ans += "\t\t";
-                }
-                ans += "\n";
-            }
-            if (nonFoils > 0) {
-                ans += card.getName() + "\t";
-                ans += card.getSet() + "\t";
-                ans += card.getRarity() + "\t";
-                ans += nonFoils + "\t";
-                Price todaysPrice = prices
-                        .stream()
-                        .filter(p -> p.getDate().toString().equals(today.toString()))
-                        .findFirst()
-                        .orElse(null);
-                Price yestedaysPrice = prices
-                        .stream()
-                        .filter(p -> p.getDate().toString().equals(yesteday.toString()))
-                        .findFirst()
-                        .orElse(null);
-                Price weekagoPrice = prices
-                        .stream()
-                        .filter(p -> p.getDate().toString().equals(weekago.toString()))
-                        .findFirst()
-                        .orElse(null);
-                if (todaysPrice != null) {
-                    ans += todaysPrice.getUsd_foil() + "\t";
-				} else {
-                    ans += "\t";
-                }
-                if (todaysPrice != null && yestedaysPrice != null) {
-                    double a = todaysPrice.getUsd();
-                    double b = yestedaysPrice.getUsd();
-                    ans += (a - b) + "\t";
-                    ans += ((a - b) / a) + "\t";
-                } else {
-                    ans += "\t\t";
-                }
-                if (todaysPrice != null && weekagoPrice != null) {
-                    double a = todaysPrice.getUsd();
-                    double b = weekagoPrice.getUsd();
-                    ans += (a - b) + "\t";
-                    ans += ((a - b) / a) + "\t";
-                } else {
-                    ans += "\t\t";
-                }
-                ans += "\n";
-            }
-        }
-
-        List<String> names = cardPurchaseAssociationRepository
+    ArrayList<HashMap<Object, Object>> dummyTest() {
+        Date today = new Date(Calendar.getInstance().getTime().getTime());
+        List<Transaction> transactions = transactionRepository
                 .findAll()
                 .stream()
-                .map(c -> c.getCard().getName())
-                .collect(Collectors.toSet())
-                .stream()
-                .sorted()
+                .sorted(Comparator.comparing(Transaction::getDate))
                 .collect(Collectors.toList());
-        System.out.println(ans);
-        return ans;
-    }
-
-    @GetMapping(path = "/mtggoldfish")
-    public @ResponseBody
-    String mtgGoldfish() {
-        String ans = "";
-        ans += ("Card\tSet ID\tSet Name\tQuantity\tFoil\n");
-        Map<String, List<CardPurchaseAssociation>> cpas = cardPurchaseAssociationRepository.findAll().stream()
-                                                                                           .collect(groupingBy(CardPurchaseAssociation::getCardId));
-        for (String key : cpas.keySet()) {
-            Card card = cpas.get(key).get(0).getCard();
-            long foils = cpas.get(key).stream().filter(c -> c.isFoil()).count();
-            long nonFoils = cpas.get(key).stream().filter(c -> !c.isFoil()).count();
-            if (foils > 0) {
-                ans += card.getName() + "\t" + card.getSet() + "\t" + card.getSet_name() + "\t" + foils
-                       + "\t" + "FOIL" + "\n";
+        ArrayList<HashMap<Object, Object>> ans = new ArrayList<>();
+        for (Transaction transaction : transactions) {
+            HashMap<Object, Object> responce = new HashMap<>();
+            transactionHelper.setTransaction(transaction);
+            System.out.println(transaction.getDate() +
+                               "\t" +
+                               transaction.getDescription() +
+                               "\t" +
+                               currency.format(transaction.getCost()));
+            Date date = transaction.getDate();
+            ArrayList<HashMap<Object, Object>> prices = new ArrayList<>();
+            while (date.compareTo(today) != 1) {
+                String value = currency.format(transactionHelper.getCurrentValueAtDate(date));
+                HashMap<Object, Object> priceData = new HashMap<>();
+                System.out.println("\t" + date.toString() + "\t" + value);
+                date = addDays(date,
+                               1);
+                priceData.put("date",
+                              date);
+                priceData.put("value",
+                              value);
+                prices.add(priceData);
             }
-            if (nonFoils > 0) {
-                ans += card.getName() + "\t" + card.getSet() + "\t" + card.getSet_name() + "\t" + nonFoils
-                       + "\t" + "" + "\n";
-            }
+            responce.put("purchase",
+                         transaction.getDate());
+            responce.put("description",
+                         transaction.getDescription());
+            responce.put("cost",
+                         transaction.getCost());
+            responce.put("value",
+                         prices);
+            ans.add(responce);
         }
-        System.out.println(ans);
         return ans;
     }
 
-    @GetMapping(path = "/temp")
-    public @ResponseBody
-    String temp() {
+    private Double getStringPrice(CardPurchaseAssociation cpa, Optional<Price> price) {
 
-        List<Card> cards = cardRepository.findAllBySet("iko");
-        List<CardPurchaseAssociation> temp = cardPurchaseAssociationRepository
-                .findAll()
-                .stream()
-                .filter(c -> c
-                                     .getCard()
-                                     .getRarity()
-                                     .equals(Rarity.COMMON) ||
-                             c
-                                     .getCard()
-                                     .getRarity()
-                                     .equals(Rarity.UNCOMMON))
-                .collect(Collectors.toList());
-
-        //		List<Card> cards = cardRepository.findAll().stream().filter(c -> c.getSet_name().equals("Ikoria: Lair of "
-        //				+ "Behemoths")).collect(Collectors.toList());
-        Date today = new java.sql.Date(Calendar.getInstance().getTime().getTime());
-        Set<Price> prices = priceRepository.findAllByDate(today);
-        String ans = "";
-        for (Card card : cards) {
-            ans += (card.getId() + "\t" + card.getName() + "\t" + card.getSet_name() + "\t" + card.isPromo() + "\t"
-                    + card.isVariation() + "\t");
-
-            Optional<Price> priceOptional = prices.stream().filter(p -> p.getCard().getId().equals(card.getId()))
-                                                  .findFirst();
-            if (priceOptional.isPresent()) {
-                Price price = priceOptional.get();
-                String usd = price.getUsd() == null ? " " : price.getUsd().toString();
-                String foil = price.getUsd_foil() == null ? " " : price.getUsd_foil().toString();
-                ans += (usd + "\t" + foil);
+        if (price.isPresent()) {
+            Price todaysPrice = price.get();
+            if (cpa.isFoil()) {
+                return todaysPrice.getUsd_foil();
             } else {
-                ans += ("\t");
+                return todaysPrice.getUsd();
             }
-            ans += "\t" + (card.getCollector_number()) + "\n";
 
         }
-        System.out.println(ans);
-        return ans;
+        return null;
     }
 
     private Date addDays(Date date, int days) {
@@ -460,4 +436,17 @@ public class InventoryController {
               days);
         return new Date(c.getTimeInMillis());
     }
+
+    private double getCardsPrice(String cardId, boolean isFoil) {
+        Optional<Price> price = priceRepository.findMostRecentByCard(cardId);
+        if (price.isPresent()) {
+            if (isFoil && price.get().getUsd_foil() != null) {
+                return price.get().getUsd_foil();
+            } else if (!isFoil && price.get().getUsd() != null) {
+                return price.get().getUsd();
+            }
+        }
+        return 0.0;
+    }
+
 }

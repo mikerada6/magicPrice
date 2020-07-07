@@ -3,9 +3,13 @@ package com.example.mtg.Controller;
 import com.example.mtg.Helper.JSONHelper;
 import com.example.mtg.Helper.ScryfallHelper;
 import com.example.mtg.Magic.Card;
+import com.example.mtg.Magic.CardJson;
+import com.example.mtg.Magic.CardJsonBuilder;
 import com.example.mtg.Magic.Format;
+import com.example.mtg.Magic.Price;
 import com.example.mtg.Repository.CardRepository;
 import com.example.mtg.Repository.FormatRepository;
+import com.example.mtg.Repository.PriceRepository;
 import com.example.mtg.ResourceNotFoundException;
 import me.tongfei.progressbar.ProgressBar;
 import org.json.simple.JSONArray;
@@ -36,6 +40,8 @@ public class CardController {
     @Autowired
     private FormatRepository formatRepository;
     @Autowired
+    PriceRepository priceRepository;
+    @Autowired
     private JSONHelper jsonHelper;
     @Autowired
     private ScryfallHelper scryfallHelper;
@@ -43,7 +49,41 @@ public class CardController {
     @GetMapping(path = "/{cardId}")
     @CrossOrigin(origins = "http://localhost:4200")
     public @ResponseBody
-    Card getCard(
+    CardJson getCard(
+            @PathVariable("cardId")
+                    String cardId) {
+        logger.info("got a request for card id: {}.", cardId);
+        Card card = cardRepository.findById(cardId).orElseThrow(() -> new ResourceNotFoundException());
+        CardJsonBuilder builder = new CardJsonBuilder();
+        Optional<Price> price = priceRepository.findMostRecentByCard(card.getId());
+        builder.setTypeLine(card.getTypeLine())
+                      .setSet(card.getSet())
+                      .setCollector_number(card.getCollector_number())
+                      .setColor(card.getColor().toString())
+                      .setOracleText(card.getOracleText())
+                      .setReleased_at(card.getReleased_at().toString())
+                      .setUri(card.getURI())
+                      .setVariation(card.isVariation()+"")
+                      .setPrintNumber(card.getPrintNumber() +"")
+                      .setPromo(card.isPromo()+"")
+                      .setSet_name(card.getSet_name())
+                      .setName(card.getName())
+                      .setId(card.getId())
+                      .setLang(card.getLang())
+                      .setManaCost(card.getManaCost())
+                      .setRarity(card.getRarity().toString());
+        if(price.isPresent())
+        {
+            Price tempPrice = price.get();
+            builder.setUsd(tempPrice.getUsd());
+            builder.setUsd_foil(tempPrice.getUsd_foil());
+        }
+        return builder.createCardJson();
+    }
+    @GetMapping(path = "/{cardId}/price")
+    @CrossOrigin(origins = "http://localhost:4200")
+    public @ResponseBody
+    Card getCardPrice(
             @PathVariable("cardId")
                     String cardId) {
         logger.info("got a request for card id: {}.", cardId);
@@ -62,12 +102,49 @@ public class CardController {
     @GetMapping(path = "/set/{setName}")
     @CrossOrigin(origins = "http://localhost:4200")
     public @ResponseBody
-    List<Card> getSets(
+    ArrayList<CardJson> getSets(
             @PathVariable("setName")
                     String setName) {
         logger.info("got a request for cards from set {}.", setName);
 
-        return cardRepository.findAllBySet(setName).stream().sorted(Card::compareTo).collect(Collectors.toList());
+        List<Card> cards = cardRepository
+                .findAllBySet(setName)
+                .stream()
+                .sorted(Card::compareTo)
+                .collect(Collectors.toList());
+
+            ArrayList<CardJson> cardJsons = new ArrayList<>();
+            for(Card card: cards)
+            {
+                CardJsonBuilder builder = new CardJsonBuilder();
+                Optional<Price> price = priceRepository.findMostRecentByCard(card.getId());
+                builder.setTypeLine(card.getTypeLine())
+                       .setSet(card.getSet())
+                       .setCollector_number(card.getCollector_number())
+                       .setColor(card.getColor().toString())
+                       .setOracleText(card.getOracleText())
+                       .setReleased_at(card.getReleased_at().toString())
+                       .setUri(card.getURI())
+                       .setVariation(card.isVariation()+"")
+                       .setPrintNumber(card.getPrintNumber() +"")
+                       .setPromo(card.isPromo()+"")
+                       .setSet_name(card.getSet_name())
+                       .setName(card.getName())
+                       .setId(card.getId())
+                       .setLang(card.getLang())
+                       .setManaCost(card.getManaCost())
+                       .setRarity(card.getRarity().toString());
+                if(price.isPresent())
+                {
+                    Price tempPrice = price.get();
+                    if(tempPrice.getUsd() !=null)
+                    builder.setUsd(tempPrice.getUsd());
+                    if(tempPrice.getUsd_foil() !=null)
+                    builder.setUsd_foil(tempPrice.getUsd_foil());
+                }
+                cardJsons.add(builder.createCardJson());
+        }
+            return cardJsons;
     }
 
 

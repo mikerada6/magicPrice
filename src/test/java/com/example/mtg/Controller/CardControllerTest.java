@@ -37,22 +37,6 @@ public class CardControllerTest {
 		initMocks(this);
 	}
 
-	@Test
-	public void testGetCard() {
-		Card c = DomainUtils.getTestObject(Card.class);
-		// Setup
-		when(mockCardRepository.findById(c.getId())).thenReturn(Optional.of(c));
-
-		// Run the test
-		final Card result = cardControllerUnderTest.getCard(c.getId());
-
-		// Verify the results
-		Assert.assertEquals(c.getId(), result.getId());
-		Assert.assertEquals(c.getName(), result.getName());
-		Assert.assertEquals(c.getColor(), result.getColor());
-		Assert.assertEquals(c.getSet(), result.getSet());
-
-	}
 
 	@Test
 	public void testDeleteCard() {

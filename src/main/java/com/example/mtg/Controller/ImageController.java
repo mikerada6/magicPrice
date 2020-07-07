@@ -62,13 +62,13 @@ public class ImageController {
             }
 
             try {
+                String directory = "./main/resources/img/set/"+card.getSet();
                 byte[] response = getImageFromURL(urlString);
-                saveImageToFile(card.getSet(), card.getId(), response);
+                saveImageToFile(directory, card.getId(), response);
                 return response;
             } catch (IOException e) {
             }
         }
-        int stop = 0;
         return null;
     }
 
@@ -206,6 +206,8 @@ public class ImageController {
      * @throws IOException
      */
     private void saveImageToFile(String folder, String file, byte[] image) throws IOException {
+        logger.info("Folder: " + folder);
+        logger.info("\tfile: " + file);
         String PATH = "";
         String directoryName = PATH.concat(folder);
         String fileName = file + ".jpg";
@@ -217,7 +219,8 @@ public class ImageController {
             // use directory.mkdirs(); here instead.
         }
         FileOutputStream fos =
-                new FileOutputStream(folder + "//" + fileName);
+                new FileOutputStream(folder + "/" + fileName);
+        logger.info(folder + "/" + fileName);
         fos.write(image);
         fos.close();
     }

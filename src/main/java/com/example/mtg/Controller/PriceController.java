@@ -336,8 +336,19 @@ public class PriceController {
                     .collect(Collectors.groupingBy(s -> s.getCard().getId() + "|" + s.getDate().toString()));
             List<Price> temp = map.entrySet().stream().filter(s -> s.getValue().size() > 1)
                     .map(s -> s.getValue().get(0)).collect(Collectors.toList());
-            logger.info("Found {} that will be deleted for date {}", temp.size(), date.toString());
-            toDelete.addAll(temp);
+            if(temp.size()>0) {
+                logger.info("Found {} that will be deleted for date {}", temp.size(), date.toString());
+//                priceRepository.deleteAll(temp);
+                for(Price del: temp)
+                {
+                    logger.info("Delete id {}", del.getId());
+                    priceRepository.delete(del);
+                }
+            }
+            else
+            {
+                logger.info("nothing to delete for date {}." , date.toString());
+            }
 
         }
         logger.info("Going to delete a total of {} records", toDelete.size());

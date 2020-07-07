@@ -4,6 +4,7 @@ import com.example.mtg.Magic.Card;
 import com.example.mtg.Magic.Price;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Date;
@@ -19,6 +20,12 @@ import java.util.Set;
 	Set<Price> findAllByDate(Date date);
 
 	Optional<Price> findByDateAndAndCard(Date date, Card card);
+
+	@Query(value = "select * from price where card_id= :cardId order by date desc limit 1;", nativeQuery = true )
+	public Optional<Price> findMostRecentByCard(@Param("cardId") String cardId);
+
+	@Query(value = "select * from price where card_id= :cardId order by date desc limit 7;", nativeQuery = true )
+	public List<Price> findMostRecentWeekByCard(@Param("cardId") String cardId);
 
 	void deleteByIdIn(List<Long> ids);
 
