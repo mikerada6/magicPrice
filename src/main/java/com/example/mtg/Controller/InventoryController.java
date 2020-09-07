@@ -129,6 +129,8 @@ public class InventoryController {
         }
     }
 
+
+
     @GetMapping(path = "/transaction/set/{setName}/")
     @CrossOrigin(origins = "http://localhost:4200")
     public @ResponseBody
@@ -141,14 +143,25 @@ public class InventoryController {
                         .collect(
                                 Collectors.toSet());
         Map<String, List<Card>> name = cards.stream().collect(groupingBy(Card::getName));
-        List<Card> sortedList = cards.stream()
+        Set<String> sortedList = cards.stream()
                                      .sorted(Comparator.comparing(Card::convertCollectorNumber))
-                                     .collect(Collectors.toList());
+                                     .map(c -> c.getName())
+                                     .collect(Collectors.toSet());
         List<CardPurchaseAssociation> cpa = cardPurchaseAssociationRepository.findAll();
-        for (Card card : sortedList) {
-            long count = cpa.stream().filter(c -> c.getCard().getName().equals(card.getName())).count();
-
-            System.out.println(card.getName() + "\t" + count);
+        for (String cardName : sortedList) {
+            long count = cpa.stream().filter(c -> c.getCard().getName().equals(cardName)).count();
+            Card card = cards
+                    .stream()
+                    .filter(c -> c.getName().equals(cardName))
+                    .findFirst()
+                    .orElse(null);
+            if(card!=null) {
+                System.out.println(card.getName() + "\t" + card.getRarity() + "\t" + count);
+            }
+            else
+            {
+                System.out.println(cardName + "\t" + "\t" + 0);
+            }
         }
     }
 
@@ -252,6 +265,57 @@ public class InventoryController {
         transactionRepository.deleteById(id);
     }
 
+    @CrossOrigin(origins = "http://localhost:4200")
+    @GetMapping(path = "/collection/export/deckstats")
+    public @ResponseBody
+    void exportdeckstats() {
+        HashMap<String, String> replace = new HashMap<>();
+        replace.put("MagicFest 2019","Grand Prix");
+        replace.put("MagicFest 2020","Grand Prix");
+        List<CardPurchaseAssociation> cards = cardPurchaseAssociationRepository.findAll();
+        List<CardPurchaseAssociation> foils = cards.stream().filter(c -> c.isFoil()).collect(Collectors.toList());
+        List<CardPurchaseAssociation> nonFoils = cards.stream().filter(c -> !c.isFoil()).collect(Collectors.toList());
+        Set<String> cardIds = cards.stream().map(cpa -> cpa.getCardId()).collect(Collectors.toSet());
+        System.out.println("Count,Tradelist Count,Name,Edition,Card Number,Condition,Language,Foil,Signed,Artist Proof,Altered Art,Misprint,Promo,Textless,My Price");
+        for(String id: cardIds)
+        {
+            long foilCount = foils.stream().filter(c -> c.getCardId().equals(id)).count();
+            long nonFoilCount = nonFoils.stream().filter(c -> c.getCardId().equals(id)).count();
+            Card card = cards
+                    .stream()
+                    .filter(c -> c.getCardId().equals(id))
+                    .map(c -> c.getCard())
+                    .findFirst()
+                    .orElse(null);
+            if(nonFoilCount >0) {
+                System.out.print(nonFoilCount);
+                System.out.print("," + 0);
+                System.out.print(",\"" + card.getName() + "\"");
+                if(replace.keySet().contains(card.getSet_name())) {
+                    System.out.print("," + replace.get(card.getSet_name()));
+                }
+                else
+                {
+                    System.out.print("," + card.getSet_name());
+                }
+                System.out.print("," + card.getCollector_number());
+                System.out.print(",Near Mint");
+                System.out.print(",English");
+                System.out.println(",,,,,,,,<span class='note'>N/A</span>");
+            }
+            if(foilCount >0) {
+                System.out.print(foilCount);
+                System.out.print("," + 0);
+                System.out.print(",\"" + card.getName() + "\"");
+                System.out.print("," + card.getSet_name());
+                System.out.print("," + card.getCollector_number());
+                System.out.print(",Near Mint");
+                System.out.print(",English");
+                System.out.print(",Foil");
+                System.out.println(",,,,,,,<span class='note'>N/A</span>");
+            }
+        }
+    }
     @CrossOrigin(origins = "http://localhost:4200")
     @GetMapping(path = "/collection")
     public @ResponseBody

@@ -37,6 +37,9 @@ public class Card implements Comparable<Card> {
     private String uri;
     private String oracleText;
     private String set;
+    private boolean reserved;
+    @JsonIgnore
+    private double[] imgArray;
 
     @ManyToMany(fetch = FetchType.LAZY,
             cascade = {
@@ -368,6 +371,21 @@ public class Card implements Comparable<Card> {
         this.set = set;
     }
 
+    public boolean isReserved() {
+        return reserved;
+    }
+
+    public void setReserved(boolean reserved) {
+        this.reserved = reserved;
+    }
+
+    public double[] getImgArray() {
+        return imgArray;
+    }
+
+    public void setImgArray(double[] imgArray) {
+        this.imgArray = imgArray;
+    }
 
     public Collection<CardPurchaseAssociation> getCardPurchaseAssociation() {
         return cardPurchaseAssociation;

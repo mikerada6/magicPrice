@@ -1,5 +1,7 @@
 package com.example.mtg.Magic;
 
+import java.util.Optional;
+
 public class CardJsonBuilder {
     private String typeLine;
     private String set;
@@ -114,6 +116,28 @@ public class CardJsonBuilder {
     public CardJsonBuilder setUsd_foil(double usd_foil) {
         this.usd_foil = usd_foil;
         return this;
+    }
+
+    public CardJsonBuilder createCardJson(Card card) {
+        CardJsonBuilder builder = new CardJsonBuilder();
+        builder.setTypeLine(card.getTypeLine())
+               .setSet(card.getSet())
+               .setCollector_number(card.getCollector_number())
+               .setColor(card.getColor().toString())
+               .setOracleText(card.getOracleText())
+               .setReleased_at(card.getReleased_at().toString())
+               .setUri(card.getURI())
+               .setVariation(card.isVariation() + "")
+               .setPrintNumber(card.getPrintNumber() + "")
+               .setPromo(card.isPromo() + "")
+               .setSet_name(card.getSet_name())
+               .setName(card.getName())
+               .setId(card.getId())
+               .setLang(card.getLang())
+               .setManaCost(card.getManaCost())
+               .setRarity(card.getRarity().toString());
+
+        return builder;
     }
 
     public CardJson createCardJson() {

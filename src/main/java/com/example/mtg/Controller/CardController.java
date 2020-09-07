@@ -55,23 +55,8 @@ public class CardController {
         logger.info("got a request for card id: {}.", cardId);
         Card card = cardRepository.findById(cardId).orElseThrow(() -> new ResourceNotFoundException());
         CardJsonBuilder builder = new CardJsonBuilder();
+        builder = builder.createCardJson(card);
         Optional<Price> price = priceRepository.findMostRecentByCard(card.getId());
-        builder.setTypeLine(card.getTypeLine())
-                      .setSet(card.getSet())
-                      .setCollector_number(card.getCollector_number())
-                      .setColor(card.getColor().toString())
-                      .setOracleText(card.getOracleText())
-                      .setReleased_at(card.getReleased_at().toString())
-                      .setUri(card.getURI())
-                      .setVariation(card.isVariation()+"")
-                      .setPrintNumber(card.getPrintNumber() +"")
-                      .setPromo(card.isPromo()+"")
-                      .setSet_name(card.getSet_name())
-                      .setName(card.getName())
-                      .setId(card.getId())
-                      .setLang(card.getLang())
-                      .setManaCost(card.getManaCost())
-                      .setRarity(card.getRarity().toString());
         if(price.isPresent())
         {
             Price tempPrice = price.get();
@@ -117,23 +102,8 @@ public class CardController {
             for(Card card: cards)
             {
                 CardJsonBuilder builder = new CardJsonBuilder();
+                builder = builder.createCardJson(card);
                 Optional<Price> price = priceRepository.findMostRecentByCard(card.getId());
-                builder.setTypeLine(card.getTypeLine())
-                       .setSet(card.getSet())
-                       .setCollector_number(card.getCollector_number())
-                       .setColor(card.getColor().toString())
-                       .setOracleText(card.getOracleText())
-                       .setReleased_at(card.getReleased_at().toString())
-                       .setUri(card.getURI())
-                       .setVariation(card.isVariation()+"")
-                       .setPrintNumber(card.getPrintNumber() +"")
-                       .setPromo(card.isPromo()+"")
-                       .setSet_name(card.getSet_name())
-                       .setName(card.getName())
-                       .setId(card.getId())
-                       .setLang(card.getLang())
-                       .setManaCost(card.getManaCost())
-                       .setRarity(card.getRarity().toString());
                 if(price.isPresent())
                 {
                     Price tempPrice = price.get();
@@ -233,6 +203,7 @@ public class CardController {
                     String released_at = (String) datum.get("released_at");
                     card.setReleased_at(Date.valueOf(released_at));
                     card.setTypeLine((String) datum.get("type_line"));
+                    card.setReserved((boolean) datum.get("reserved"));
                     if (datum.containsKey("colors")) {
                         JSONArray JSONcolors = (JSONArray) datum.get("colors");
                         String colors = "";

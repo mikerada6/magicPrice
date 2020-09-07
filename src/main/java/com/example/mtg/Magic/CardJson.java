@@ -62,6 +62,7 @@ public class CardJson
         this.usd_foil = usd_foil;
     }
 
+
     public String getTypeLine ()
     {
         return typeLine;

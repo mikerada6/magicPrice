@@ -30,10 +30,10 @@ public class ScryfallHelper {
     public void bruteForce() {
         String url = "https://archive.scryfall.com/bulk-data/default-cards/default-cards-";
         int year = 2020;
-        int month = 6;
-        int day = 13;
-        for (int hour = 0; hour < 60; hour++) {
-            for (int minute = 0; minute < 60; minute++) {
+        int month = 8;
+        int day = 30;
+        for (int hour = 9; hour < 60; hour++) {
+            for (int minute = 35; minute < 60; minute++) {
                 for (int second = 0; second < 60; second++) {
                     String date = String.format("%04d",
                                                 year) +
@@ -130,4 +130,30 @@ public class ScryfallHelper {
 
         return null;
     }
+
+    public JSONObject loadJson(String fileLocation)
+    {
+        JSONParser jsonParser = new JSONParser();
+        try (FileReader reader = new FileReader(fileLocation)) {
+            //Read JSON file
+            Object obj = jsonParser.parse(reader);
+
+            return (JSONObject) obj;
+
+        } catch (FileNotFoundException e) {
+            logger.error("FileNotFoundException {}",
+                         e);
+            e.printStackTrace();
+        } catch (IOException e) {
+            logger.error("IOException {}",
+                         e);
+            e.printStackTrace();
+        } catch (ParseException e) {
+            logger.error("ParseException {}",
+                         e);
+            e.printStackTrace();
+        }
+        return null;
+    }
+
 }

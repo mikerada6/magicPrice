@@ -3,10 +3,13 @@ package com.example.mtg.Controller;
 import com.example.mtg.Helper.JSONHelper;
 import com.example.mtg.Helper.ScryfallHelper;
 import com.example.mtg.Magic.Card;
+import com.example.mtg.Magic.Card2;
 import com.example.mtg.Magic.Price;
+import com.example.mtg.Repository.Card2Repository;
 import com.example.mtg.Repository.CardRepository;
 import com.example.mtg.Repository.PriceRepository;
 import com.example.mtg.ResourceNotFoundException;
+import io.magicthegathering.javasdk.api.CardAPI;
 import me.tongfei.progressbar.ProgressBar;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -30,6 +33,8 @@ import java.text.NumberFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.groupingBy;
+
 @Controller
 @RequestMapping(path = "/price")
 public class PriceController {
@@ -37,6 +42,11 @@ public class PriceController {
     private static final Logger logger = LoggerFactory.getLogger(PriceController.class);
     @Autowired
     private CardRepository cardRepository;
+
+    @Autowired
+    private Card2Repository card2Repository;
+
+
     @Autowired
     private PriceRepository priceRepository;
 
@@ -49,7 +59,8 @@ public class PriceController {
     private static Date subtractDays(Date date, int days) {
         Calendar c = Calendar.getInstance();
         c.setTime(date);
-        c.add(Calendar.DATE, -days);
+        c.add(Calendar.DATE,
+              -days);
         return new Date(c.getTimeInMillis());
     }
 
@@ -58,7 +69,8 @@ public class PriceController {
     List<Price> getAll() {
         logger.info("Starting to fetch all the prices");
         List<Price> prices = priceRepository.findAll();
-        logger.info("All {} have been retrieved from the database", prices.size());
+        logger.info("All {} have been retrieved from the database",
+                    prices.size());
         return prices;
     }
 
@@ -70,7 +82,8 @@ public class PriceController {
         List<Card> cards = getAllCards();
         csvWriter.append("cardId,date,usd,usd_foil,eur,tix" + System.lineSeparator());
 //        cards = cards.stream().filter(c -> c.getSet().equals("iko")).collect(Collectors.toList());
-        ProgressBar pb = new ProgressBar("Generating data", cards.size());
+        ProgressBar pb = new ProgressBar("Generating data",
+                                         cards.size());
         for (Card card : cards) {
             pb.step();
             Collection<Price> prices = card.getPrice();
@@ -91,56 +104,95 @@ public class PriceController {
         return stringBuffer.toString();
     }
 
-        @PostMapping(path = "/extrapolateMissingData")
+    @GetMapping(path ="/brute")
+    public void bruteForce()
+    {
+        scryfallHelper.bruteForce();
+    }
+    @PostMapping(path = "/extrapolateMissingData")
     public @ResponseBody
     String extrapolateMissingData(String startDate, String endDate) {
         List<Price> prices = getAll();
-        Map<String, List<Price>> priceMap = prices.stream().collect(Collectors.groupingBy(t -> t.getCard().getId()));
+        Map<String, List<Price>> priceMap = prices.stream().collect(groupingBy(t -> t.getCard().getId()));
         Date start = Date.valueOf(startDate);
         Date end = Date.valueOf(endDate);
         Map<String, List<Price>> startPriceMap = prices.stream().filter(p -> p.getDate().equals(start))
-                .collect(Collectors.groupingBy(t -> t.getCard().getId()));
+                                                       .collect(groupingBy(t -> t.getCard().getId()));
         Map<String, List<Price>> endPriceMap = prices.stream().filter(p -> p.getDate().equals(end))
-                .collect(Collectors.groupingBy(t -> t.getCard().getId()));
+                                                     .collect(groupingBy(t -> t.getCard().getId()));
 
         ArrayList<String> both = new ArrayList<>();
         both.addAll(startPriceMap.keySet());
         both.addAll(endPriceMap.keySet());
         Set<String> set = both.stream().filter(s -> endPriceMap.containsKey(s) && startPriceMap.containsKey(s))
-                .collect(Collectors.toSet());
+                              .collect(Collectors.toSet());
         Date day1 = Date.valueOf("2020-02-22");
         Calendar cal = Calendar.getInstance();
         cal.setTime(start);
-        cal.add(Calendar.DATE, 1);
+        cal.add(Calendar.DATE,
+                1);
         Date newDate = new Date(cal.getTimeInMillis());
         ArrayList<Price> priceUpdates = new ArrayList<>();
         for (String key : set) {
 
             Price a = startPriceMap.get(key).get(0);
             Price b = endPriceMap.get(key).get(0);
-            logger.info("Adding price data for {}", a.getCard().getName());
+            logger.info("Adding price data for {}",
+                        a.getCard().getName());
             Price one = new Price();
 
             Card c = cardRepository.findById(a.getCard().getId()).orElse(null);
             one.setCard(c);
             one.setDate(day1);
-            double usd = a.getUsd() > 0 && b.getUsd() > 0 ? linearize(0, a.getUsd(), 2, a.getUsd(), 1) : -1;
+            double usd = a.getUsd() > 0 && b.getUsd() > 0 ? linearize(0,
+                                                                      a.getUsd(),
+                                                                      2,
+                                                                      a.getUsd(),
+                                                                      1) : -1;
             double usd_foil = a.getUsd_foil() > 0 && b.getUsd_foil() > 0 ?
-                    linearize(0, a.getUsd_foil(), 2, a.getUsd_foil(), 1) :
+                    linearize(0,
+                              a.getUsd_foil(),
+                              2,
+                              a.getUsd_foil(),
+                              1) :
                     -1;
-            double tix = a.getTix() > 0 && b.getTix() > 0 ? linearize(0, a.getTix(), 2, a.getTix(), 1) : -1;
-            double eur = a.getEur() > 0 && b.getEur() > 0 ? linearize(0, a.getEur(), 2, a.getEur(), 1) : -1;
+            double tix = a.getTix() > 0 && b.getTix() > 0 ? linearize(0,
+                                                                      a.getTix(),
+                                                                      2,
+                                                                      a.getTix(),
+                                                                      1) : -1;
+            double eur = a.getEur() > 0 && b.getEur() > 0 ? linearize(0,
+                                                                      a.getEur(),
+                                                                      2,
+                                                                      a.getEur(),
+                                                                      1) : -1;
             one.setUsd(usd);
             one.setUsd_foil(usd_foil);
             one.setTix(tix);
             one.setEur(eur);
 
-            usd = a.getUsd() > 0 && b.getUsd() > 0 ? linearize(0, a.getUsd(), 2, a.getUsd(), 2) : -1;
+            usd = a.getUsd() > 0 && b.getUsd() > 0 ? linearize(0,
+                                                               a.getUsd(),
+                                                               2,
+                                                               a.getUsd(),
+                                                               2) : -1;
             usd_foil = a.getUsd_foil() > 0 && b.getUsd_foil() > 0 ?
-                    linearize(0, a.getUsd_foil(), 2, a.getUsd_foil(), 2) :
+                    linearize(0,
+                              a.getUsd_foil(),
+                              2,
+                              a.getUsd_foil(),
+                              2) :
                     -1;
-            tix = a.getTix() > 0 && b.getTix() > 0 ? linearize(0, a.getTix(), 2, a.getTix(), 2) : -1;
-            eur = a.getEur() > 0 && b.getEur() > 0 ? linearize(0, a.getEur(), 2, a.getEur(), 2) : -1;
+            tix = a.getTix() > 0 && b.getTix() > 0 ? linearize(0,
+                                                               a.getTix(),
+                                                               2,
+                                                               a.getTix(),
+                                                               2) : -1;
+            eur = a.getEur() > 0 && b.getEur() > 0 ? linearize(0,
+                                                               a.getEur(),
+                                                               2,
+                                                               a.getEur(),
+                                                               2) : -1;
 
             priceUpdates.add(one);
             if (priceUpdates.size() > 500) {
@@ -161,41 +213,102 @@ public class PriceController {
     public @ResponseBody
     HashMap<String, String> getCardChange(@PathVariable("cardId")
                                                   String cardId) {
-        Locale locale = new Locale("en", "US");
+        Locale locale = new Locale("en",
+                                   "US");
         NumberFormat currencyFormatter = NumberFormat.getCurrencyInstance(locale);
         HashMap<String, String> map = new HashMap<>();
         Card card = cardRepository.findById(cardId).orElseThrow(() -> new ResourceNotFoundException());
-        map.put("card", card.getName());
-        map.put("set", card.getSet().toUpperCase());
-        map.put("rarity", card.getRarity().toString());
+        map.put("card",
+                card.getName());
+        map.put("set",
+                card.getSet().toUpperCase());
+        map.put("rarity",
+                card.getRarity().toString());
         Date today = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
-        Date yesteday = subtractDays(today, 1);
-        Date weekago = subtractDays(today, 7);
-        Price todayPrice = priceRepository.findByDateAndAndCard(today, card).orElse(null);
-        Price yestedayPrice = priceRepository.findByDateAndAndCard(yesteday, card).orElse(null);
-        Price weekagoPrice = priceRepository.findByDateAndAndCard(weekago, card).orElse(null);
+        Date yesteday = subtractDays(today,
+                                     1);
+        Date weekago = subtractDays(today,
+                                    7);
+        Price todayPrice = priceRepository
+                .findByDateAndAndCard(today,
+                                      card)
+                .orElse(null);
+        Price yestedayPrice = priceRepository
+                .findByDateAndAndCard(yesteday,
+                                      card)
+                .orElse(null);
+        Price weekagoPrice = priceRepository
+                .findByDateAndAndCard(weekago,
+                                      card)
+                .orElse(null);
         if (todayPrice != null) {
-            map.put("price", currencyFormatter.format(todayPrice.getUsd()));
+            map.put("price",
+                    currencyFormatter.format(todayPrice.getUsd()));
         }
         if (todayPrice != null && yestedayPrice != null) {
             double temp = yestedayPrice.getUsd() - todayPrice.getUsd();
-            map.put("daily", (currencyFormatter.format(temp)));
-            map.put("dailyPercent", (temp / todayPrice.getUsd()) + "");
+            map.put("daily",
+                    (currencyFormatter.format(temp)));
+            map.put("dailyPercent",
+                    (temp / todayPrice.getUsd()) + "");
         }
         if (todayPrice != null && weekagoPrice != null) {
             double temp = weekagoPrice.getUsd() - todayPrice.getUsd();
-            map.put("weekly", (currencyFormatter.format(temp)));
-            map.put("weeklyPercent", (temp / todayPrice.getUsd()) + "");
+            map.put("weekly",
+                    (currencyFormatter.format(temp)));
+            map.put("weeklyPercent",
+                    (temp / todayPrice.getUsd()) + "");
         }
 
         return map;
     }
 
+    @GetMapping(path = "/testing")
+    public @ResponseBody
+    String testing() {
+        String ans = "";
+        Map<Card, List<Price>> todaysPrices = getToday().stream().collect(groupingBy(Price::getCard));
+        List<Card> cards = getAllCards();
+        Map<String, List<Card>> cardsByName = cards.stream().collect(groupingBy(Card::getName));
+        List<String> cardNames = cardsByName.keySet().stream().sorted().collect(Collectors.toList());
+        ProgressBar pb = new ProgressBar("Updating all card prices",
+                                         cardNames.size());
+        for (String name : cardNames) {
+            pb.step();
+            ArrayList<Double> values = new ArrayList<>();
+            cards = cardsByName.get(name);
+            ans += name + "\t";
+            for (Card card : cards) {
+
+                ans += card.isReserved() + "\t";
+                Optional<List<Price>> optionalPrices = Optional.ofNullable(todaysPrices.get(card));
+                if (optionalPrices.isPresent() && optionalPrices.get().size() == 1) {
+                    Price price = optionalPrices.get().get(0);
+                    if (price.getUsd() != null) {
+                        values.add(price.getUsd());
+                    }
+
+                }
+
+            }
+            long count = values.stream().count();
+            double max = values.stream().mapToDouble(v -> v).max().orElse(-1);
+            double min = values.stream().mapToDouble(v -> v).min().orElse(-1);
+            double sum = values.stream().mapToDouble(Double::doubleValue).sum();
+
+            ans+= count +'\t' + min  +'\t' + max +'\t' + sum;
+            ans += "\n";
+        }
+        pb.close();
+        System.out.println(ans);
+        return ans;
+    }
+
     @GetMapping(path = "/old")
-    public @ResponseBody String getOldDate()
-    {
+    public @ResponseBody
+    String getOldDate() {
         String good = "https://archive.scryfall.com/bulk-data/default-cards/default-cards-20200602050438.json";
-        String bad ="https://archive.scryfall.com/bulk-data/default-cards/default-cards-20200602050437.json";
+        String bad = "https://archive.scryfall.com/bulk-data/default-cards/default-cards-20200602050437.json";
         String goodResult = jsonHelper.getRequest(good);
         String badResult = jsonHelper.getRequest(bad);
         String goodFile = "/Users/mradas341/IdeaProjects/magicPrice/src/main/resources/tmp/good.json";
@@ -204,27 +317,33 @@ public class PriceController {
         try {
             URL website = new URL(goodResult);
             try (InputStream in = website.openStream()) {
-                logger.info("Starting to download data from {}.", good);
-                Files.copy(in, Paths.get(goodFile), StandardCopyOption.REPLACE_EXISTING);
+                logger.info("Starting to download data from {}.",
+                            good);
+                Files.copy(in,
+                           Paths.get(goodFile),
+                           StandardCopyOption.REPLACE_EXISTING);
                 logger.info("Data finished downloading.");
             }
             logger.info("Passed good");
-        }catch(Exception e)
-        {
-            logger.error("Failed good with error {}", e);
+        } catch (Exception e) {
+            logger.error("Failed good with error {}",
+                         e);
         }
 
         try {
             URL website = new URL(badResult);
             try (InputStream in = website.openStream()) {
-                logger.info("Starting to download data from {}.", bad);
-                Files.copy(in, Paths.get(badFile), StandardCopyOption.REPLACE_EXISTING);
+                logger.info("Starting to download data from {}.",
+                            bad);
+                Files.copy(in,
+                           Paths.get(badFile),
+                           StandardCopyOption.REPLACE_EXISTING);
                 logger.info("Data finished downloading.");
             }
             logger.info("Passed bad");
-        }catch(Exception e)
-        {
-            logger.error("Failed bad with error {}", e);
+        } catch (Exception e) {
+            logger.error("Failed bad with error {}",
+                         e);
         }
         return "done";
     }
@@ -242,7 +361,8 @@ public class PriceController {
             e.printStackTrace();
         }
         if (arrayData != null) {
-            ProgressBar pb = new ProgressBar("Updating all card prices", arrayData.size());
+            ProgressBar pb = new ProgressBar("Updating all card prices",
+                                             arrayData.size());
             for (int i = 0; i < arrayData.size(); i++) {
                 pb.step();
                 JSONObject datum = ((JSONObject) arrayData.get(i));
@@ -269,14 +389,15 @@ public class PriceController {
 
                 }
                 try {
-                    usd_foil = prices.get("usd_foil") == null ? null : Double.parseDouble((String) prices.get("usd_foil"));
+                    usd_foil = prices.get("usd_foil") ==
+                               null ? null : Double.parseDouble((String) prices.get("usd_foil"));
                 } catch (Exception e) {
 
                 }
 
                 Price price = new Price();
                 Card card = cardRepository.findById(cardId)
-                        .orElse(null);
+                                          .orElse(null);
                 if (card != null) {
                     price.setCard(card);
                     price.setDate(new java.sql.Date(Calendar.getInstance().getTime().getTime()));
@@ -302,11 +423,23 @@ public class PriceController {
         logger.info("Done price update");
         return "done";
     }
+
     @DeleteMapping(path = "/{priceId}")
     public @ResponseBody
-    void deleteByid(@PathVariable("priceId") Long priceId)
-    {
+    void deleteByid(@PathVariable("priceId") Long priceId) {
         priceRepository.deleteById(priceId);
+    }
+
+    @GetMapping(path = "/today")
+    public @ResponseBody
+    Set<Price> getToday() {
+        Date today = new java.sql.Date(Calendar.getInstance().getTime().getTime());
+        logger.info("Starting to fetch all the prices from {} ",
+                    today.toString());
+        Set<Price> todays = priceRepository.findAllByDate(today);
+        logger.info("Starting to fetch all the prices from {} ",
+                    today.toString());
+        return todays;
     }
 
 
@@ -314,9 +447,11 @@ public class PriceController {
     public @ResponseBody
     Set<Price> deleteToday() {
         Date today = new java.sql.Date(Calendar.getInstance().getTime().getTime());
-        logger.info("Starting to fetch all the prices from {} ", today.toString());
+        logger.info("Starting to fetch all the prices from {} ",
+                    today.toString());
         Set<Price> todays = priceRepository.findAllByDate(today);
-        logger.info("All {} have been retrieved from the database", todays.size());
+        logger.info("All {} have been retrieved from the database",
+                    todays.size());
         logger.info("Start to delete");
         priceRepository.deleteAll(todays);
         logger.info("End delete");
@@ -333,29 +468,87 @@ public class PriceController {
             Set<Price> prices = priceRepository.findAllByDate(date);
             ArrayList<Price> deleteThese = new ArrayList<>();
             Map<String, List<Price>> map = prices.stream()
-                    .collect(Collectors.groupingBy(s -> s.getCard().getId() + "|" + s.getDate().toString()));
+                                                 .collect(groupingBy(s -> s.getCard().getId() +
+                                                                          "|" +
+                                                                          s.getDate().toString()));
             List<Price> temp = map.entrySet().stream().filter(s -> s.getValue().size() > 1)
-                    .map(s -> s.getValue().get(0)).collect(Collectors.toList());
-            if(temp.size()>0) {
-                logger.info("Found {} that will be deleted for date {}", temp.size(), date.toString());
+                                  .map(s -> s.getValue().get(0)).collect(Collectors.toList());
+            if (temp.size() > 0) {
+                logger.info("Found {} that will be deleted for date {}",
+                            temp.size(),
+                            date.toString());
 //                priceRepository.deleteAll(temp);
-                for(Price del: temp)
-                {
-                    logger.info("Delete id {}", del.getId());
+                for (Price del : temp) {
+                    logger.info("Delete id {}",
+                                del.getId());
                     priceRepository.delete(del);
                 }
-            }
-            else
-            {
-                logger.info("nothing to delete for date {}." , date.toString());
+            } else {
+                logger.info("nothing to delete for date {}.",
+                            date.toString());
             }
 
         }
-        logger.info("Going to delete a total of {} records", toDelete.size());
-        logger.info("Size before delete {}", priceRepository.count());
+        logger.info("Going to delete a total of {} records",
+                    toDelete.size());
+        logger.info("Size before delete {}",
+                    priceRepository.count());
         priceRepository.deleteAll(toDelete);
-        logger.info("Size after delete {}", priceRepository.count());
+        logger.info("Size after delete {}",
+                    priceRepository.count());
         return toDelete;
+    }
+
+    @GetMapping(path = "/load/mtgjson")
+    public @ResponseBody
+    String laodMtgJson() {
+        int multiverseId = 456700;
+        io.magicthegathering.javasdk.resource.Card card = CardAPI.getCard(multiverseId);
+        Card2 newCard = new Card2();
+        newCard.setId(card.getId());
+        newCard.setLayout(card.getLayout());
+        newCard.setName(card.getName());
+        newCard.setManaCost(card.getManaCost());
+        newCard.setCmc(card.getCmc());
+        newCard.setType(card.getType());
+        newCard.setRarity(card.getRarity());
+        newCard.setText(card.getText());
+        newCard.setOriginalText(card.getOriginalText());
+        newCard.setFlavor(card.getFlavor());
+        newCard.setArtist(card.getArtist());
+        newCard.setNumber(card.getNumber());
+        newCard.setPower(card.getPower());
+        newCard.setToughness(card.getToughness());
+        newCard.setLoyalty(card.getLoyalty());
+        newCard.setMultiverseid(card.getMultiverseid());
+        newCard.setImageName(card.getImageName());
+        newCard.setWatermark(card.getWatermark());
+        newCard.setBorder(card.getBorder());
+        newCard.setTimeshifted(card.isTimeshifted());
+        newCard.setHand(card.getHand());
+        newCard.setLife(card.getLife());
+        newCard.setReserved(card.isReserved());
+        newCard.setReleaseDate(card.getReleaseDate());
+        newCard.setStarter(card.isStarter());
+        newCard.setSet(card.getSet());
+        newCard.setSetName(card.getSetName());
+        newCard.setImageUrl(card.getImageUrl());
+        newCard.setPriceHigh(card.getPriceHigh());
+        newCard.setPriceMid(card.getPriceMid());
+        newCard.setPriceLow(card.getPriceLow());
+        newCard.setOnlinePriceHigh(card.getOnlinePriceHigh());
+        newCard.setOnlinePriceMid(card.getOnlinePriceMid());
+        newCard.setOnlinePriceLow(card.getOnlinePriceLow());
+        card2Repository.save(newCard);
+        logger.info("Start Loading");
+        JSONObject data = scryfallHelper.loadJson("/Users/mradas341/IdeaProjects/magicPrice/src/main/resources/tmp/AllPrices.json");
+        logger.info("done Loading");
+//        data = (JSONObject) data.get("data");
+        JSONObject temp = getJSONObject(getJSONObject(data,
+                                                      "data"),
+                                        "d14c82cd-c2df-5d09-883a-9a6583d9c475");
+//        data.getJSONObject("d14c82cd-c2df-5d09-883a-9a6583d9c475").get("paper").get("cardkingdom").get("retail").get("normal").size()
+        return "done";
     }
 
     private double linearize(double x1, double y1, double x2, double y2, double input) {
@@ -369,7 +562,12 @@ public class PriceController {
     private List<Card> getAllCards() {
         logger.info("Starting to fetch all the cards");
         List<Card> cards = cardRepository.findAll();
-        logger.info("All {} have been retrieved from the database", cards.size());
+        logger.info("All {} have been retrieved from the database",
+                    cards.size());
         return cards;
+    }
+
+    public JSONObject getJSONObject(JSONObject jsonObject, String key) {
+        return (JSONObject) jsonObject.get(key);
     }
 }
