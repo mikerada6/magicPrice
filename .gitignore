@@ -111,6 +111,7 @@ fabric.properties
 *.zip
 *.tar.gz
 *.rar
+*.json
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
@@ -130,11 +131,7 @@ buildNumber.properties
 
 # End of https://www.gitignore.io/api/java,maven,intellij
 
-src/main/resources/application.properties
-/src/main/resources/application-aws.properties
-/src/main/resources/application-prod.properties
-/src/main/resources/application-qa.properties
-/src/main/resources/application-dev.properties
+*.properties
 
 *.png
 *.jpg
